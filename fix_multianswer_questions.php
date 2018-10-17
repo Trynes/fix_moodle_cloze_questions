@@ -209,14 +209,10 @@ Now, to run the fix:
     die;
 }
 
-//$USER->id = 2;
-
 //$DB->set_debug(true);
 
-//To make things quicker, I only want to check for the dodgy questions!
-
+//New questions need a unique code for their stamps...
 //hostname using the inbuilt moodle function was returning 'unknownhost'
-//so I'm just going to shuck in elearn.cit.edu.au
 //I don't think it really matters if it's not host specific...
 function make_unique_code($extra = '') {
     $hostname = 'admin.cli.script.';
