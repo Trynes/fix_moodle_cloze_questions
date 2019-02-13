@@ -98,7 +98,8 @@ question | ------- sequence ---------- |
 ----------+-----------------------------+
 3758257 | 2783831,2783832,2783833 |
 
-If you looked at the mdl_question result for the first sequence question '2783831', you would see that the parent is one of the questions above:
+If you looked at the mdl_question result for the first sequence question '2783831', you would see that the parent 
+is one of the questions above:
 
 --- id -- | parent |
 ----------+----------+
@@ -116,16 +117,12 @@ question | ------- qma.sequence ------- | --- q.id --- | q.parent
 7302100 | 7302101,7302102,7302103 | 7302101 | 7302100
 9878958 | 9878959,9878960,9878961 | 9878959 | 9878958
 
-
-
 Why is this a problem? 
 
 Because if someone deletes the parent question '3758257', every other question with 
 the sequence '2783831,2783832,2783833' will now have NO sequence questions listed 
 and this will cause an error within Moodle! If you check the mdl_question_multianswer 
 table for the question, you will find it now likely has a sequence of ',,' instead.
-
-
 
 To fix this, the script will do the following...
 
@@ -157,7 +154,10 @@ of {1:SA:=bla}..... I'm not sure yet!
 
 ------------------------------------------------------------------------------------------------------------------------
 
-IMPORTANT REMINDER: This script will run for a long time on big systems if called for all questions. Run ONLY while in maintenance mode, or for a particular course that you know will not be edited while running the script, as another user may simultaneously edit one of the questions being checked/fixed and cause more problems.
+IMPORTANT REMINDER: This script will run for a long time on big systems if called for all questions. 
+Run ONLY while in maintenance mode, or for a particular course that you know will not be edited 
+while running the script, as another user may simultaneously edit one of the questions being 
+checked/fixed and cause more problems.
 
 ------------------------------------------------------------------------------------------------------------------------
 
@@ -192,7 +192,7 @@ You can get information on COURSES that might have more than one sequence match 
 ALL courses
     sudo -u www-data /usr/bin/php admin/cli/fix_multianswer_sequences.php --course=* --info
 
-a few ourses:
+a few courses:
     sudo -u www-data /usr/bin/php admin/cli/fix_multianswer_sequences.php --course=123456,223344,445566 --info
 
 a single ourses:
@@ -203,15 +203,19 @@ Now, to run the fix:
     sudo -u www-data /usr/bin/php admin/cli/fix_multianswer_sequences.php --course=123456,223344,445566 --fix
     sudo -u www-data /usr/bin/php admin/cli/fix_multianswer_sequences.php --course=123456 --fix
 
+
+To save the output of all of this, be sure to add [  2>&1 | tee filename.txt   ] to the end of your command.
+e.g. sudo -u www-data /usr/bin/php admin/cli/fix_multianswer_sequences.php --course=123456 --fix 2>&1 | tee INFO_Q_123456.txt
+
 ";
 
     echo $help;
     die;
 }
 
+
 //$DB->set_debug(true);
 
-//New questions need a unique code for their stamps...
 //hostname using the inbuilt moodle function was returning 'unknownhost'
 //I don't think it really matters if it's not host specific...
 function make_unique_code($extra = '') {
@@ -228,6 +232,7 @@ function make_unique_code($extra = '') {
 /*------------------------------------------------------------------
 *  Take any text and turn it into plain text without HTML or spaces
 *   but keep any image filenames that might be in it...
+*   (this makes searching for questiontext and comparing easier!)
 -------------------------------------------------------------------*/
 
 function plainText($text) {
@@ -249,20 +254,44 @@ function plainText($text) {
 	//This is if it doesn't!...
 	$plaintext = preg_replace('%<img\s.*?src=".*?/?([^/]+?(\.gif|\.png|\.jpg))"\s.*?>%s', '[img: '.$image.'] ', $plaintext);
 	//If there are any non-breaking space, remove them...
+	$plaintext = preg_replace('%<img.*?@+\/%s', '[img: '.$image.'] ', $plaintext);
+	//If the img source has the height and width at the end, not the front...
+	$plaintext = preg_replace('("\s.+?\s\/>)', '', $plaintext);
 	$plaintext = preg_replace('/&nbsp;/', ' ', $plaintext);
-	//If there are blank spaces more than one space, make it one...
-	$plaintext = preg_replace('/\s\s+/', ' ', $plaintext);
+	//Remove any \n from the text and replace with a space (they're usually line-breaks)...
+	$plaintext = str_replace('\n', ' ', $plaintext);
+	//Remove any \r from the text...
+	$plaintext = str_replace('\r', '', $plaintext);
+	//Now get rid of all full stops and spaces! Leave JUST the text :P
+	//Hopefully this doesn't result in unexpected matches!
+	$plaintext = preg_replace('([^0-9a-zA-Z{}/$%#]+)', '', $plaintext);
 	
 	
 	return $plaintext;
 }
 
+//This one removes the img filename so you can compare JUST questiontext.
+function noimgText($text) {
+	$noimgtext = preg_replace('((img.*?(png|PNG|jpg|JPG|gif|GIF)))', '', $text);	
+	
+	return $noimgtext;
+}
+
+
+/*-----------------------------------------------------------------------
+*  Query the database to find questions in ANY course, or course-specific
+------------------------------------------------------------------------*/
 $checklist = preg_split('/\s*,\s*/', $options['questions'], -1, PREG_SPLIT_NO_EMPTY);
 $courselist = preg_split('/\s*,\s*/', $options['course'], -1, PREG_SPLIT_NO_EMPTY);
 
 //if * is in the questionlist (meaning all questions)
 if (in_array('*', $checklist)) {
-    $where = 'WHERE sequence IN (SELECT sequence FROM mdl_question_multianswer GROUP BY sequence HAVING COUNT(*) > 1)'; //Just want the sequences that appear more than once...
+	//Just want the sequences that appear more than once, as this is the main issue that breaks imports/restore...
+	//Missing parent is the other issue, but will try to fix that later...
+    $where = 'WHERE sequence IN (SELECT sequence FROM mdl_question_multianswer GROUP BY sequence HAVING COUNT(*) > 1)';	
+    $params = array(); //No params
+} else if (in_array('*', $courselist)) {	
+	$where = 'WHERE sequence IS NOT NULL'; //I want all questions that have a sequence (are multi-answer in other words)...	
     $params = array(); //No params
 } else {//The user has specified a question to check
 	if($options['questions']) {
@@ -309,14 +338,27 @@ else if($options['course']) {
 			."---------------------------------------------------------------\n";
 }}
 	
-//require_once($CFG->dirroot. '/lib/questionlib.php');
-
+//-----------------------------------------------------------------------------------------------
+//-----------------------------------------------------------------------------------------------
+// This gets the info about a sequence or questions in a course....
+//
+// I made this not echo stuff out as it does in return_info so that it can be used in other 
+//  functions for data gathering purposes. This might not be the best way to do it, however.
+//  Downfall of being a novice programmer/developer/whatever...
+//-----------------------------------------------------------------------------------------------
+//-----------------------------------------------------------------------------------------------
 function get_sequence_info($sequence=null,$params=null) {
 	global $DB;
 	//var_dump($sequence);
 	//Go through each of the dodgy multianswer questions
 	//and return the following data:
-	//id, parent, name, question text, sequence
+	//sequence, duplicate id's, parent info: [id, name, question text], duplicate count,
+	//attempted or not, category, courseid, course shortname, 
+	//coursecount (no. of courses affected), quiz name, question text,  
+	//attempted info: [courseid, course name, quiz name],
+	//sequence length/count (sqs_length), any missing sequence questions?: [sqs_missing, sqs_exist], 
+	//similar sequences, other question ids with this similar sequence, number of these other qs,
+	//number of cloze placeholder questions in the question text (QuestionCloseCount)
 	
 	$data = array();
 	$data['sequence'] = $sequence;
@@ -449,6 +491,11 @@ function get_sequence_info($sequence=null,$params=null) {
 		foreach($text as $qt) {
 			$qtext[] = $qt->questiontext;
 			$data['qtext'] = $qtext;
+			//Find out how many placeholders for cloze answers are in the questiontext...
+			$cloze = preg_match_all('{#[0-9]}', $qt->questiontext, $result, PREG_PATTERN_ORDER);
+			//var_dump($result[0]);
+			$countCloze = $result[0];
+			$data['QuestionClozeCount'][$question] = count($countCloze);
 		}
 	}
 		
@@ -498,19 +545,22 @@ function get_sequence_info($sequence=null,$params=null) {
 	
 	//First, you have to explode the sequence string into an array...
 	$sqs = explode(',', $sequence);
+	$data['sqs_length'] = count($sqs);
+	//var_dump($data['sqs_length']);
 	//var_dump($sqs);
 	//Now check over each question id, placing values in the appropriate array...
 	$sqs_exist = array();
 	$sqs_missing = array();
-	
+		
 	foreach ($sqs as $check) {
+		if($check != '') {
 		if ($DB->get_record('question', array('id'=>$check))) {
 			$sqs_exist[] = $check;			
 			//$data['sqs_missing'] = 'all present';
 		} else {
 			//$data['sqs_exist'] = 'all missing';
 			$sqs_missing[] = $check;				
-		}
+		}}
 	}
 	$data['sqs_exist'] = $sqs_exist;
 	$data['sqs_missing'] = $sqs_missing;
@@ -557,17 +607,206 @@ function get_sequence_info($sequence=null,$params=null) {
 		$data['pqname']	= $record->name;
  		$data['pqtext']	= plainText($record->questiontext);	
 		}
-	} 
+		
+		//Check whether the parent questiontext contains the same amount of placeholder questions as appear in the sequence.
+		//If it doesn't, it means the question was edited in another course, removing/adding sequence questions in the linked questions.
+		//echo $data['pqtext']."\n\n";
+		//extract only text like {#1},etc
+		$cloze = preg_match_all('{#[0-9]}', $data['pqtext'], $result, PREG_PATTERN_ORDER);
+		//var_dump($result[0]);
+		$countCloze = $result[0];
+		$data['QuestionClozeCount']['parent'] = count($countCloze);
+	}
 	
 	return $data;
 }
 
+//-----------------------------------------------------------------------------------------------
+//-----------------------------------------------------------------------------------------------
+// This returns the info for get_sequence_info...
+//-----------------------------------------------------------------------------------------------
+//-----------------------------------------------------------------------------------------------
+function return_info($getinfo) {
+			//var_dump($getinfo);	
+			$info="\n//////////////////////////////////////////////////////////////////\n"
+				 ."----- Sequence $getinfo[sequence] info -----\n"
+				 ."//////////////////////////////////////////////////////////////////\n\n"
+		 		 ."[ No. of questions using this sequence ]: $getinfo[duplicatecount]\n"
+				 ."[                  Those questions are ]: ";
+		
+		foreach($getinfo['duplicateids'] as $duplicates) {
+			$info .= $duplicates;
+			$info .= " ";					
+		}
+			
+			$info .="\n\n[ The following questions have been attempted ]: ";			
+		if(!empty($getinfo['attempted'])) { foreach($getinfo['attempted'] as $a) {
+			$info .= $a;
+			$info .= " ";	
+		}} 
+			$info .="\n\n/////////////////////////////////////";
+	
+	//Useless info if the sequence is 0, so...
+	if($getinfo['sequence'] !== '0') {
+		if(!empty($getinfo['sqs_exist'])) {
+			$info .="\n\n[ SQs exist ]: ".implode(',', $getinfo['sqs_exist']);
+		} 
+		if(!empty($getinfo['sqs_missing'])) {
+			$info .="\n[ SQs MISSING ]: ".implode(',', $getinfo['sqs_missing']);
+		}
+		if(!empty($getinfo['sqs_length'])) {
+			$info .="\n[ SQs length ]: ".$getinfo['sqs_length'];
+		}
+		if(!empty($getinfo['QuestionClozeCount'])) {
+			$info .="\n[ {#X} count ]: ".$getinfo['QuestionClozeCount'];
+		}
+	}
+		
+		
+		if((!empty($getinfo['similar'])) && ($getinfo['similar'][0] != $getinfo['sequence'])) { 
+			$info .="\n\n/////////////////////////////////////";
+			$info .="\n\n[ similar sequences ]: ";
+			foreach($getinfo['similar'] as $sim) {
+					$info .= $sim;
+					$info .= " | ";
+			}
+		
+			$info .= "\n\n[ No. of question using this other sequence ]: $getinfo[otherCount]";
+			$info .= "\n[ questions for similar sequences ]: ";
+			if(!empty($getinfo['otherQs'])) { foreach($getinfo['otherQs'] as $oq) {
+					$info .= $oq;
+					$info .= " ";
+			}}
+		
+			$info .="\n\n/////////////////////////////////////";
+		}
+			if(!empty($getinfo['parent'])) {
+			$info .="\n\n[ parent.q ]: $getinfo[parent]\n" 
+				   ."[  pq.name ]: $getinfo[pqname]\n"
+				   ."[  pq.text ]: $getinfo[pqtext]\n";
+			} else {
+			$info .="\n\n[ parent.q ]: NULL\n" 
+				   ."[  pq.name ]: NULL\n"
+				   ."[  pq.text ]: NULL\n";
+			}
+							
+			foreach($getinfo['qtext'] as $text) {
+				if(!empty($getinfo['parent'])) {
+					$info .="\n[ 1q.text ]:  "
+						   .plaintext($text)."\n";
+						//just one will do!
+						break;
+				} 
+			}
+	
+			//Commented out the below because just want the quiz info if they have been attempted...
+//			$info .="\n\n[ quiz names ]:\n";
+//			if(!empty($getinfo['quiz'])) { foreach($getinfo['quiz'] as $qz) {
+//				$info .= "...";
+//				$info .= $qz;
+//				$info .="\n";
+//			}}			 
+			
+		if(!empty($getinfo['courseid']) && !empty($getinfo['quiz']) && !empty($getinfo['attempted'])) {
+			$info .="\n//////////////////////////\n";
+			$info .="\n\nInfo for just the attempted questions..."; 
+			$info .="\n[ questionid : courseid : coursename : quiz ]:\n\n";	
+			
+			$attmptd = new ArrayIterator(array_values($getinfo['attempted']));
+			$c_id = new ArrayIterator(array_values($getinfo['attemptedCourseID']));
+			$c_name = new ArrayIterator(array_values($getinfo['attemptedCourseName']));
+			$qz = new ArrayIterator(array_values($getinfo['attemptedQuiz']));						
+			
+			$courseinfos = new MultipleIterator;
+			$courseinfos->attachIterator($attmptd);
+			$courseinfos->attachIterator($c_id);
+			$courseinfos->attachIterator($c_name);
+			$courseinfos->attachIterator($qz);			
+						
+			$courseinfo = array();
+			foreach($courseinfos as $cinfo) {
+				$courseinfo[] = $cinfo[0].' --:-- '.$cinfo[1].' --:-- '.$cinfo[2].' --:-- '.$cinfo[3];
+			} 
+			//var_dump($courseinfo);
+			
+			foreach($courseinfo as $ci) {
+				$info .= "...";
+				$info .= $ci;
+				$info .="\n\n";	
+			}
+		} 
+		if (!empty($getinfo['courseid'])) {
+			$info .="\n//////////////////////////\n";
+			$info .="\n[ Questions that have NOT been attempted in any quizzes, but are in these courses and categories...]\n";	
+			if($getinfo['sequence'] !== '0') {
+				$info .="\n[ question id : course id : course name : category\n\n";
+			} else {
+				$info .="\n[ question id : course id : course name : category : qtext : placeholders...]...]\n\n";
+			}
+			
+			$q_id = new ArrayIterator(array_values($getinfo['duplicateids']));
+			$c_id = new ArrayIterator(array_values($getinfo['courseid']));
+			$c_name = new ArrayIterator(array_values($getinfo['course']));
+			$q_cat = new ArrayIterator(array_values($getinfo['category']));	
+			//If the sequence is 0, add the qtext for ALL questions...
+			if($getinfo['sequence'] === '0') {
+				$q_text = new ArrayIterator(array_values($getinfo['qtext']));
+				$q_ph = new ArrayIterator(array_values($getinfo['QuestionClozeCount']));
+			}
+			
+			$courseinfos = new MultipleIterator;
+			$courseinfos->attachIterator($q_id);
+			$courseinfos->attachIterator($c_id);
+			$courseinfos->attachIterator($c_name);
+			$courseinfos->attachIterator($q_cat);
+			if($getinfo['sequence'] === '0') {
+				$courseinfos->attachIterator($q_text);
+				$courseinfos->attachIterator($q_ph);
+			}
+			
+			$courseinfo = array();
+			foreach($courseinfos as $cinfo) {				
+				if($getinfo['sequence'] !== '0') {
+					$courseinfo[] = $cinfo[0].' --:-- '.$cinfo[1].' --:-- '.$cinfo[2].' --:-- '.$cinfo[3];
+				} else {
+					$courseinfo[] = $cinfo[0].' --:-- '.$cinfo[1].' --:-- '.$cinfo[2].' --:-- '.$cinfo[3].' ============ '.plaintext($cinfo[4]).' --:-- [ '.$cinfo[5].' ]';
+				}
+			} 
+			//var_dump($courseinfo);
+			
+			foreach($courseinfo as $ci) {
+				$info .= "...";
+				$info .= $ci;
+				$info .="\n\n";	
+			}
+
+		} else {
+			$info .="No course information?!\n\n";	
+		}
+			$info .="\n"
+				  ."-------------------------------------------------------------------\n\n";
+			echo $info;
+}
+
+
+
+//-------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------
 //-------------------------------------------------------------------------------------------
 //To fix the dodgy questions!
 //-------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------
+//-------------------------------------------------------------------------------------------
+
+
 //Only run the below if it's been told to fix issues; don't want it for just info gathering
+// as it can take about 10 minutes to run (depending on how many questions you have in the DB)
+//-------------------------------------------------------------------------------------------
+// Gather the questiontext for ALL multianswer questions...
+//-------------------------------------------------------------------------------------------
 if (!empty($options['fix'])) {
 	echo "Finding and stripping the HTML (except for img filenames) from multianswer questiontext for later use and storing it in a global variable called AllMulti...\n";
+
 	$allmultianswer = $DB->get_records_sql("
 				SELECT q.id,q.name,q.category,q.parent,q.questiontext,ma.sequence 
 				FROM {question} q 
@@ -579,6 +818,9 @@ if (!empty($options['fix'])) {
 	foreach($allmultianswer as $multi) {
 		$multi->questiontext = plainText($multi->questiontext);
 	}
+	
+	//Remove if running for q's without exact text..
+	//$allmultianswer = '';
 
 	//Need this globally available so it doesn't have to run for every single question!
 	$GLOBALS["AllMulti"] = $allmultianswer;
@@ -586,14 +828,82 @@ if (!empty($options['fix'])) {
 	echo "Done. There are now [ $result ] questions to compare text against.\n";
 	echo "Moving on...\n\n";
 }
+
+//------------------------------------------------------------------------------------------------
+// If a multianswer question has more sequence questions than actual placeholders in the question,
+// update their sequence to 0 ONLY if the question has NOT been attempted. 
+//
+// This could have occurred because of a bad replace, or it could be because the parent question 
+// was edited, removing some cloze answers. If the question has been attempted, you don't want to 
+// mess with it like this. It would be better to manually check the attempts for the right answer.
+// NOTE: make sure you save the output so you can fix the question if this turns out to be a mistake!
+//  The output will show the questiontext for the multi-answer questions.
+//------------------------------------------------------------------------------------------------
+function unequal_sequence($duplicate=null,$params=null) {
+	global $DB;
+	var_dump($duplicate);
+	
+	//So long as the sequence is not already equal to '0'...
+	if($duplicate['sequence'] !== '0' && (empty($duplicate['attempted']))) {
+		
+	$sqslength = $duplicate['sqs_length'];
+	$placeholders = $duplicate['QuestionClozeCount'];
+	
+	$qtext = $duplicate['qtext'][0];
+	
+	$plaintext = plainText($qtext);
+	//var_dump($plaintext);
+	
+	$sqs = $duplicate['sqs_exist'];
+	$qsToGet = implode("','",$sqs);
+	//var_dump($qsToGet);
+	
+	$sequencetext = $DB->get_records_sql("SELECT id,questiontext FROM {question} WHERE id IN ('$qsToGet')");
+	//var_dump($sequencetext);
+	
+	//$result = find_same_then_similar_questiontext($duplicate,null);
+	
+	if($placeholders !== $sqslength) {
+		echo "\n The sequence length is [ ".$sqslength." ] but there is/are only [ ".$placeholders." ] placeholder(s)! \n";
+		echo "\n The (plaintext) questiontext is: \n\n";
+		echo "   ".$plaintext."\n\n";
+		echo " The questiontext for the sequence question(s) is/are: \n\n";
+		foreach($sequencetext as $q) {
+			echo "  ".$q->id." : ".$q->questiontext."\n";
+		}
+		//echo "\n Another question with this questiontext that has the correct amount of sequence questions is: \n\n";
+		
+		echo "\nUpdating the sequence to 0. Will fix in the next step.\n";
+		
+		$id = $duplicate['duplicateids'][0];
+		var_dump($id);
+		$question = $DB->get_record_sql("SELECT * FROM {question_multianswer} WHERE question = '$id'");
+		var_dump($question);
+		
+		if(!empty($question)) {
+			$question->sequence = '0';
+			if($DB->update_record('question_multianswer', $question)) {
+				echo "sequence updated to '0' for question [ ".$question->id." ]\n";
+			} else {
+				echo "Could not update the sequence for question [ ".$question->id." ]\n";
+			}
+		} else {
+			echo "something went wrong. \n";
+		}		
+	}} else {
+		echo "The sequence for this question is [ ".$duplicate['sequence']." ]. Moving on...\n\n";
+	}
+}
+
 //-------------------------------------------------------------------------------------------
-//If a sequence has no parent, and a bunch of missing sequence questions,
-//update the database to make that sequence the same as the one in
-//a question with the same question text...
+//If a sequence (not = '0') has a bunch of missing sequence questions,
+// update the sequence to that of one where all sequence questions exist,
+// so long as that sequence has the same amount of sequence questions,
+// and the question text is the same....
 //-------------------------------------------------------------------------------------------
 function find_same_then_similar_questiontext($duplicate=null,$params=null) {
 	global $DB;
-	//var_dump($duplicate);
+	//var_dump($duplicate);	
 	
 	//Create a few arrays to output messages to...
 	$message1 = array();
@@ -603,111 +913,164 @@ function find_same_then_similar_questiontext($duplicate=null,$params=null) {
 	//$resolved1 = array();
 	//$unresolved1 = array();
 	
-	//$duplicate['parent'] may not exist, so can't assign it to a variable...
-	//same for $duplicate['duplicateids']...
-		
-	if (empty($duplicate['parent'])) {
-		//Checking/Updating each question separately is really slow, so do it based on the info of the first question.
-		//Can be pretty sure if the questions all have the same sequence that they all have the same question text!
-			
+	//  DEV NOTE: $duplicate['parent'] and $duplicate['duplicateids'] may not exist, 
+	//    so can't assign them to a variable...
+	
+	//If there is no parent question (meaning the questions with this sequence are well and truly stuffed)...
+	if (empty($getinfo['parent'])) {
+
 		$duplicates = $duplicate['duplicateids'];
 		//Blow the array up into a comma separated list...
 		$duplicatelist = implode("','", $duplicates);
 
 		$matched = array();
 
-		//Just use one question...
-		$qToCheck = $duplicates[0];
-		//var_dump($qToCheck);			
+		//If the sequence is equal to 0 (meaning it was likely updated from an emptied-out sequence)...
+		// grab the length of the questiontext placeholders so we can compare them to the sequence you might
+		// want to replace them with...
+		if($qsequence->sequence === '0') {
+			//echo $duplicate['QuestionClozeCount']."\n";
 
-		//Now, get the info for this question...
-		$qinfo 	   = $DB->get_record_sql("SELECT * FROM {question} WHERE id = '$qToCheck'");
-		$qsequence = $DB->get_record_sql("SELECT * FROM {question_multianswer} WHERE question = '$qToCheck'");
-		//var_dump($qinfo);
-		
-		
-		//------------------------check for MATCHING questiontext-----------------------//
-		
-		echo "\nChecking to see if there is EXACTLY matching question text and a viable sequence to replace it with...\n";		
-		//Record how long it takes...
-		$starttime = microtime(true);
-		//Find all the matching questions in the question table that have this name and text but are not in the duplicates list...
-		$matching = $DB->get_records_sql("
-							SELECT q.id,q.name,q.category,q.parent,q.questiontext,ma.sequence 
-							FROM {question} q 
-							JOIN {question_multianswer} ma ON q.id = ma.question 
-							WHERE q.id NOT IN ('$duplicatelist') 
-							AND q.questiontext = ?", array($qinfo->questiontext));		
+			//Would have to check ALL duplicate questions, not just the first...
 
+			$text = plainText($qinfo->questiontext);
+			$cloze = preg_match_all('{#[0-9]}', $text, $result, PREG_PATTERN_ORDER);
+			//var_dump($result[0]);
+			$countCloze = $result[0];
+			$qsLength = count($countCloze);
+		}
+		
+		//So long as the sequence is NOT '0'....
+		if(($duplicate['sequence'] !== '0')) {
+							
+			//  DEV NOTE: Checking/Updating each question separately is really slow and likely unnecessary, 
+			//  so do it based on the info of the first question.
+			//
+			//  (You can be pretty sure if the questions all have the same sequence that they all 
+			//   have the same question text (except when the sequence is 0)!)
+						
+			//Just use the first question...
+			$qToCheck = $duplicates[0];
+			//var_dump($qToCheck);			
+
+			//Get the info for this question...
+			$qinfo 	   = $DB->get_record_sql("SELECT * FROM {question} WHERE id = '$qToCheck'");
+			$qsequence = $DB->get_record_sql("SELECT * FROM {question_multianswer} WHERE question = '$qToCheck'");
+			//var_dump($qinfo);
+
+			//explode the comma separated sequence list into an array...
+			$QS = explode(',', $qsequence->sequence);
+			//count how many sequence questions are in it....
+			$qsLength = count($QS);
+
+			//------------------------------------------------------------------------------//
+			//------------------------------------------------------------------------------//
+			//------------------------check for MATCHING questiontext-----------------------//
+			//------------------------------------------------------------------------------//
+			//------------------------------------------------------------------------------//
+
+			echo "\nChecking to see if there is EXACTLY matching question text and a viable sequence to replace it with...\n";		
+			//Record how long it takes...
+			$starttime = microtime(true);
+			//Find all the matching questions in the question table that have this EXACT question text but are not in the duplicates list...
+			$matching = $DB->get_records_sql("
+								SELECT q.id,q.name,q.category,q.parent,q.questiontext,ma.sequence 
+								FROM {question} q 
+								JOIN {question_multianswer} ma ON q.id = ma.question 
+								WHERE q.id NOT IN ('$duplicatelist') 
+								AND q.questiontext = ?", array($qinfo->questiontext));		
+		}
 		//So long as you have a match...
 		if(!empty($matching)) {
-			//Now see if one of those questions has a viable sequence in the multianswer table...
-			//Just use the first one that has a viable sequence: no need to check the rest...			
+			//Now see if one of those questions has a viable sequence in the multianswer table...						
 			foreach ($matching as $check) {
 				//var_dump($check);
 				//If the sequence in $matching is not the same as the one for this question or 0...
-				if($check->sequence !== $qsequence->sequence) {
-				if($check->sequence !== '0') {
+				if(($check->sequence !== $qsequence->sequence) && ($check->sequence !== '0')) {
 					$getinfo = get_sequence_info($check->sequence);
 					//var_dump($getinfo);
 					//If there are no sequence questions missing for this matching question
+					// and they contain the same amount of sequence questions,
 					// assign this sequence to $viablesequence and break the loop 
 					// (don't need to check any others; the first one will do)....
+					if($getinfo['sqs_length'] !== $qsLength) {
+							echo "original_sqs_length = ".$qsLength." | matched_sqs_length = ".$getinfo['sqs_length']." | matched_qid = ".$check->id."\n";
+						} 				
+					if($getinfo['sqs_length'] === $qsLength) {
 					if(empty($getinfo['sqs_missing'])) {
-						$viablesequence = $getinfo['sequence'];
+						$viablesequence = $getinfo['sequence'];						
+
 						echo "Viable sequence found for question.id [ $qToCheck ] in question.id [ $check->id ]....\n";
+						//Just use the first one that has a viable sequence: no need to check any after that...
 						break;
 					} else {
 						$matchedDud[] = $check->id;
+					}} else {
+						$matchedDud[] = $check->id;
 					}
-				}} 	
+				} 	
 			} 
 		}
 		else {
-			echo "No matching questiontext found for question.id [ $qToCheck ]....\n";
+			echo "==== No matching questiontext found for question.id [ $qToCheck ]....\n";
 		}
-		
+		//If there was no viable sequence detected, but there were matches with a missing sequence...
 		if(!empty($matchedDud) && empty($viablesequence)) {
-			echo "Matching text found in " . count($matchedDud) . " questions, but no viable sequence found for question.id [ $qToCheck ]\n";
+			echo "==== Matching text found in " . count($matchedDud) . " questions, but no viable sequence found for question.id [ $qToCheck ]\n";
+			//var_dump($matchedDud);
 		} 
-		
+
 		//var_dump($viablesequence);
 
 		$endtime = microtime(true);
 		$duration = $endtime - $starttime; //calculates total time taken
-		echo "Query took $duration microseconds; \n\n";
+		echo "  Query took $duration microseconds; \n\n";
+
+
+		//------------------------------------------------------------------------------//
+		//------------------------------------------------------------------------------//
+		//------------------------check for SIMILAR questiontext-----------------------//
+		//------------------------------------------------------------------------------//
+		//------------------------------------------------------------------------------//
 		
-			
 		//If there are results for AllMulti and there were no matches from the above
 		// search for no HTML matches now...
 		if ($GLOBALS["AllMulti"] && empty($viablesequence)) {
-			echo "\nChecking to see if there is matching NO HTML question text and a viable sequence to replace it with...\n";	
-				
-			//------------------------check for SIMILAR questiontext-----------------------//
-			$plaintext = plainText($qinfo->questiontext);
+			echo "\nChecking to see if there is matching PLAIN TEXT question text and a viable sequence to replace it with...\n";	
 			
+			//plaintext has the img filename in it...
+			$plaintext = plainText($qinfo->questiontext);
+			//text only does NOT include the img...
+			$textonly = noimgText($plaintext);
 			//var_dump($qinfo->questiontext);
 			//var_dump($plaintext);	
-						
+
 			$allmulti = $GLOBALS["AllMulti"];
 			//var_dump($GLOBALS["AllMulti"]);
-			
+
 			//Track how long this takes...
 			$starttime = microtime(true);
-			
+
 			foreach($allmulti as $nohtml) {
+				$noimgtext = noimgText($nohtml->questiontext);
+
 				if($plaintext == $nohtml->questiontext) {					
-					//If the sequence in $nohtml is not the same as the one for this question or 0...
+					//If the sequence in $nohtml is not the same as the one for this question or 0 or not the same length...
 					if($nohtml->sequence !== $qsequence->sequence) {
 					if($nohtml->sequence !== '0') {
 						$getinfo = get_sequence_info($nohtml->sequence);
 						//var_dump($getinfo);
 						$nohtmlqtext = $DB->get_record_sql("SELECT * FROM {question} WHERE id = '$nohtml->id'");
 						//If there are no sequence questions missing for this matching question
+						// and the amount of sub-questions is the same, && (($getinfo['sqs_missing']).length === ($qsequence->sequence).length)
 						// assign this sequence to $viablesequence and break the loop 
 						// (don't need to check any others; the first one will do)....
+						if($getinfo['sqs_length'] !== $qsLength) {
+							echo "original_sqs_length = ".$qsLength." | matched_sqs_length = ".$getinfo['sqs_length']." | matched_qid = ".$check->id."\n";
+						} 					
+						if($getinfo['sqs_length'] === $qsLength) {
 						if(empty($getinfo['sqs_missing'])) {
-							$viablesequence = $getinfo['sequence'];							
+							$viablesequence = $getinfo['sequence'];	
 							echo "Found a match for question.id [ $qToCheck ] in question.id [ $nohtml->id ]....!\n";
 							echo "This question's stripped questiontext: [ $plaintext ]\n";
 							echo "    The matched stripped questiontext: [ $nohtml->questiontext ]\n\n";
@@ -718,57 +1081,116 @@ function find_same_then_similar_questiontext($duplicate=null,$params=null) {
 							break;
 						} else {
 							$noHTMLDud[] = $nohtml->id;
+						}}  else {
+							$noHTMLDud[] = $nohtml->id;
 						}
 					}}
 				} 
-			}
-			
+				else if ($textonly == $noimgtext) {
+					if($nohtml->sequence !== $qsequence->sequence) {
+					if($nohtml->sequence !== '0') {
+						$getinfo = get_sequence_info($nohtml->sequence);
+						//var_dump($getinfo);
+						$nohtmlqtext = $DB->get_record_sql("SELECT * FROM {question} WHERE id = '$nohtml->id'");
+						//If there are no sequence questions missing for this matching question
+						// and the amount of sub-questions is the same, && (($getinfo['sqs_missing']).length === ($qsequence->sequence).length)
+						// assign this sequence to $viablesequence and break the loop 
+						// (don't need to check any others; the first one will do)....
+						if($getinfo['sqs_length'] !== $qsLength) {
+							echo "original_sqs_length = ".$qsLength." | matched_sqs_length  = ".$getinfo['sqs_length']."\n";
+						} 
+						if($getinfo['sqs_length'] === $qsLength) {
+						if(empty($getinfo['sqs_missing'])) {
+
+							echo "Found a match for question.id [ $qToCheck ] in question.id [ $nohtml->id ]....!\n";
+							echo "This question's noimg stripped questiontext: [ $textonly ]\n";
+							echo "    The matched noimg stripped questiontext: [ $noimgtext ]\n\n";
+							echo "            The original questiontext: [ $qinfo->questiontext ]\n\n";
+							echo "    The original matched questiontext: [ $nohtmlqtext->questiontext ]\n\n";
+							echo "           Original sequence: [ $qsequence->sequence ]\n";
+							echo "                New sequence: [ ".$getinfo['sequence']." ]\n\n";
+
+
+							//Shell prompt that asks if you would like to use this question as the basis for the new sequence....
+							//You don't want to update a question if the img file is too different (e.g. no3.jpg instead of no4.jpg)...
+							echo "Would you like to use this matched question as the new sequence?"."\n";
+							echo "Type 'y' to update to this sequence, or 'n' to try another one, or 's' to skip this question altogether: ";
+
+							$line = fgets(STDIN);
+							if(trim($line) == 'n') {
+								echo "\n"."Skipping this sequence"."\n";
+							} else if (trim($line) == 'y'){
+								echo "\n"."Updating to this sequence"."\n";
+								$viablesequence = $getinfo['sequence'];	
+								//if you've found a match, you can break the loop...
+								break;
+							} else if (trim($line) == 's'){
+								echo "\n"."Skipping this whole question"."\n";
+								//if you've found a match, you can break the loop...
+								break;
+							}
+
+							//Don't break on the first result! We want to see if there are any others we could use.
+							//break;
+
+						} else {
+							$noHTMLDud[] = $nohtml->id;
+						}}  else {
+							$noHTMLDud[] = $nohtml->id;
+						}
+					}}
+				}
+			} 
+
 			//if there's no viable sequence, but there were matches...
 			if(!empty($noHTMLDud) && empty($viablesequence)) {
-				echo "Matching text found in " . count($noHTMLDud) . " questions, but no viable sequence found for question.id [ $qToCheck ]\n";
+				echo "==== Matching text found in " . count($noHTMLDud) . " questions, but no viable sequence found for question.id [ $qToCheck ]\n";
+				//var_dump($noHTMLDud);
 			} 
-			
+
 			//Stop timing...
 			$endtime = microtime(true);
 			$duration = $endtime - $starttime; //calculates total time taken
-			echo "Query took $duration microseconds; \n\n";
+			echo "   Query took $duration microseconds; \n\n";
 		}
-		
-		
-		
+
+
+
 		//If there is a match with a viable sequence,
 		// then assign these questions being fixed with the first sequence
 		// that has viable questions. (That sequence will now have more duplicates,
 		// but we'll fix that next). At least if we do this now, we'll know what 
 		// the sequence q's have to be!
-			
+
 		//Now, set the sequence of this question to something
 		//that actually has a question in the mdl_question table...
 		foreach($duplicates as $d) {
 			//Get the record to update...
 			$missingSR = $DB->get_record_sql("SELECT * FROM {question_multianswer} WHERE question = '$d'");
-			
+
 			if(!empty($viablesequence)) {
 				$missingSR->sequence = $viablesequence;
 				//echo "A matching viable sequence exists: [ $viablesequence ]\n\n";
 				if($DB->update_record('question_multianswer', $missingSR)) {
 					$success[] = $d;
 					$message1['success'] = $success;
-					echo "Updated sequence for question.id $d to [ $viablesequence ]\n";
+					echo "= Updated sequence for question.id $d to [ $viablesequence ]\n";
 				} else {
 					 $problem[] = $d;
 					 $message1['problem'] = $problem;
-					 echo "Failed to update record for question.id [ $d ]\n";
+					 echo "= Failed to update record for question.id [ $d ]\n";
 				}
 			} else {
 				$noseqnc[] = $qsequence->question;
 				$message1['nosequence'] = $noseqnc;
-				echo "Could not give a new sequence to question.id [ $d ]; none exist.\n";	
+				echo "= Could not give a new sequence to question.id [ $d ]; none exist.\n";	
 			} 
 		}
-		
+
 		echo "------------------------------\n";
 
+		//Deleting the question would be an ABSOLUTE last resort....
+		
 //							//If no viable sequence, try to delete the question!
 //						    echo "Attempting to delete Question: ".$record->question."\n";
 //							question_delete_question($record->question);
@@ -786,11 +1208,11 @@ function find_same_then_similar_questiontext($duplicate=null,$params=null) {
 //								echo "Question ".$record->question." successfully deleted\n";
 //						   		$resolved[] = $record->question;
 //								$message['deleted'] = $resolved;						   		
-//						    }   					
+	//						    }   					
 
-		return $message1;
-		
+		return $message1;	
 	}
+	
 }
 	
 //-------------------------------------------------------------------------------------------
@@ -812,7 +1234,7 @@ function has_parent_and_all_subquestions_fix($duplicate=null,$params=null) {
 	$missing 	= $duplicate['sqs_missing'];
 	//$qstf = array();	
 		
-	if ( (!empty($duplicate['parent'])) && (empty($missing)) ) {
+	if ( (!empty($duplicate['parent'])) && (empty($missing) && ($duplicate['sequence']) !== '0') ) {
 		
 		$duplicates = $duplicate['duplicateids'];
 		$parent = $duplicate['parent'];
@@ -863,7 +1285,7 @@ function has_parent_and_all_subquestions_fix($duplicate=null,$params=null) {
 				//var_dump($insertquestion);
 				echo "\nAdded new question to the database with id: $newQ";
 				//Add this to the success message...
-				$message2['newquestion'] = $insertquestion;				
+				$message2['newquestion'] .= $insertquestion;				
 	
 				//-------------------------------------------------------------------------------------------
 				//Now, duplicate entries in mdl_question_answers...
@@ -970,7 +1392,7 @@ function has_parent_and_all_subquestions_fix($duplicate=null,$params=null) {
 			if($DB->update_record('question_multianswer', $QMA)) {	
 				echo "Updated sequence for  [ $QMA->question ] to  [ $QMA->sequence ]\n";
 				$newsequence = $QMA->sequence;
-				$message2['updated'] = $QMA->question;
+				$message2['updated'] .= $QMA->question;
 			} else {
 				echo "Couldn't update record";
 			}
@@ -1041,6 +1463,11 @@ function has_parent_and_all_subquestions_fix($duplicate=null,$params=null) {
 				$steps = $DB->get_records_sql("SELECT id FROM {question_attempt_steps} WHERE state = 'todo' AND questionattemptID = $attempt->id");
 				//var_dump($steps);
 				
+				//Sometimes there is no 'todo' so you have to take the first 'complete' instead!
+				if (empty($steps)) {
+					$steps = $DB->get_records_sql("SELECT id FROM {question_attempt_steps} WHERE state = 'complete' AND questionattemptID = $attempt ORDER BY id LIMIT 1");
+				}
+				
 				
 				//Need to treat each step separately...
 				//echo "----------------------------------------\n";
@@ -1052,7 +1479,10 @@ function has_parent_and_all_subquestions_fix($duplicate=null,$params=null) {
 					
 					//Now we need the step data so we can change the values in the value column.
 					//But we only need the ones that are _sub?_order...
-					$stepdata = $DB->get_records_sql("SELECT * FROM {question_attempt_step_data} WHERE name LIKE '%_order' AND attemptstepid = '$stepx' ORDER BY name");
+					//Had it ordered by name, but if there were more than 10 of them, the order got screwed up (_sub10_order, sub1_order, etc)
+					//By id seemed to work. But in some cases, the order was screwed up.
+					//Finally found this...
+					$stepdata = $DB->get_records_sql("SELECT * FROM {question_attempt_step_data} WHERE name LIKE '%_order' AND attemptstepid = '$stepx' ORDER BY NULLIF(regexp_replace(name, '\D', '', 'g'), '')::int");
 					//var_dump($stepdata);
 					//Outputs array -> object X however many _sub_order values there are...
 					
@@ -1172,6 +1602,9 @@ function has_parent_and_all_subquestions_fix($duplicate=null,$params=null) {
 	}
 	return $message2;
 }
+
+
+
 /*----------------------------------/
 //----- What actually gets run -----/
 /----------------------------------*/
@@ -1218,8 +1651,6 @@ if($options['questions']) {
 	JOIN {course} c ON ctxt.instanceid = c.id '. $where, $params);
 	//var_dump($sqcourseqs1);
 }
-//Put the info into an array...
-$print = array();
 
 ///////////////////////////////////////////////
 //If you have specified a question....
@@ -1228,6 +1659,7 @@ if($options['questions']) {
 	
 if (!empty($options['fix'])) {
 	echo "-----------------------------------------------------------------------------\n";
+	echo "Looking for questions with miss-matching sequence lengths and fixing. \n";
 	echo "Attempting to match questions with no parent with other same-text questions. \n";
 	echo "If successful, will assign that sequence to this question.\n";
 	echo "If none with the same exist, check for similiar and tell me the question.id\n";
@@ -1250,133 +1682,12 @@ foreach ($sequences1 as $sequence1) {
 	if($getinfo) {		
 		if (!empty($options['info'])) {
 		//var_dump($getinfo);			
-			
-			$info="\n//////////////////////////////////////////////////////////////////\n"
-				 ."----- Sequence $getinfo[sequence] info -----\n"
-				 ."//////////////////////////////////////////////////////////////////\n\n"
-		 		 ."[ No. of questions using this sequence ]: $getinfo[duplicatecount]\n"
-				 ."[                  Those questions are ]: ";
-		
-		foreach($getinfo['duplicateids'] as $duplicates) {
-			$info .= $duplicates;
-			$info .= " ";					
-		}
-			
-			$info .="\n\n[ The following questions have been attempted ]: ";			
-		if(!empty($getinfo['attempted'])) { foreach($getinfo['attempted'] as $a) {
-			$info .= $a;
-			$info .= " ";	
-		}} 
-			$info .="\n\n/////////////////////////////////////";
-		if(!empty($getinfo['sqs_exist'])) {
-			$info .="\n\n[ SQs exist ]: ".implode(',', $getinfo['sqs_exist']);
-		} 
-		if(!empty($getinfo['sqs_missing'])) {
-			$info .="\n[ SQs MISSING ]: ".implode(',', $getinfo['sqs_missing']);
-		}
-		
-		
-		if((!empty($getinfo['similar'])) && ($getinfo['similar'][0] != $getinfo['sequence'])) { 
-			$info .="\n\n/////////////////////////////////////";
-			$info .="\n\n[ similar sequences ]: ";
-			foreach($getinfo['similar'] as $sim) {
-					$info .= $sim;
-					$info .= " | ";
-			}
-		
-			$info .= "\n\n[ No. of question using this other sequence ]: $getinfo[otherCount]";
-			$info .= "\n[ questions for similar sequences ]: ";
-			if(!empty($getinfo['otherQs'])) { foreach($getinfo['otherQs'] as $oq) {
-					$info .= $oq;
-					$info .= " ";
-			}}
-		
-			$info .="\n\n/////////////////////////////////////";
-		}
-			if(!empty($getinfo['parent'])) {
-			$info .="\n\n[ parent.q ]: $getinfo[parent]\n" 
-				   ."[  pq.name ]: $getinfo[pqname]\n"
-				   ."[  pq.text ]: $getinfo[pqtext]\n";
-			} else {
-			$info .="\n\n[ parent.q ]: NULL\n" 
-				   ."[  pq.name ]: NULL\n"
-				   ."[  pq.text ]: NULL\n";
-			}
-			
-//			$info .="\n\n[ quiz names ]:\n";
-//			if(!empty($getinfo['quiz'])) { foreach($getinfo['quiz'] as $qz) {
-//				$info .= "...";
-//				$info .= $qz;
-//				$info .="\n";
-//			}}			 
-			
-		if(!empty($getinfo['courseid']) && !empty($getinfo['quiz']) && !empty($getinfo['attempted'])) {
-			$info .="\n//////////////////////////\n";
-			$info .="\n\nInfo for just the attempted questions..."; 
-			$info .="\n[ questionid : courseid : coursename : quiz ]:\n\n";	
-			
-			$attmptd = new ArrayIterator(array_values($getinfo['attempted']));
-			$c_id = new ArrayIterator(array_values($getinfo['attemptedCourseID']));
-			$c_name = new ArrayIterator(array_values($getinfo['attemptedCourseName']));
-			$qz = new ArrayIterator(array_values($getinfo['attemptedQuiz']));						
-			
-			$courseinfos = new MultipleIterator;
-			$courseinfos->attachIterator($attmptd);
-			$courseinfos->attachIterator($c_id);
-			$courseinfos->attachIterator($c_name);
-			$courseinfos->attachIterator($qz);			
-						
-			$courseinfo = array();
-			foreach($courseinfos as $cinfo) {
-				$courseinfo[] = $cinfo[0].' --:-- '.$cinfo[1].' --:-- '.$cinfo[2].' --:-- '.$cinfo[3];
-			} 
-			//var_dump($courseinfo);
-			
-			foreach($courseinfo as $ci) {
-				$info .= "...";
-				$info .= $ci;
-				$info .="\n\n";	
-			}
-		} 
-		if (!empty($getinfo['courseid'])) {
-			$info .="\n//////////////////////////\n";
-			$info .="\n[ Questions that have NOT been attempted in any quizzes, but do appear in these courses and categories...]\n";	
-			$info .="\n[ question id : course id : course name : category...]\n\n";
-			
-			$q_id = new ArrayIterator(array_values($getinfo['duplicateids']));
-			$c_id = new ArrayIterator(array_values($getinfo['courseid']));
-			$c_name = new ArrayIterator(array_values($getinfo['course']));
-			$q_cat = new ArrayIterator(array_values($getinfo['category']));			
-			
-			$courseinfos = new MultipleIterator;
-			$courseinfos->attachIterator($q_id);
-			$courseinfos->attachIterator($c_id);
-			$courseinfos->attachIterator($c_name);
-			$courseinfos->attachIterator($q_cat);
-			
-			$courseinfo = array();
-			foreach($courseinfos as $cinfo) {
-				$courseinfo[] = $cinfo[0].' --:-- '.$cinfo[1].' --:-- '.$cinfo[2].' --:-- '.$cinfo[3];
-			} 
-			//var_dump($courseinfo);
-			
-			foreach($courseinfo as $ci) {
-				$info .= "...";
-				$info .= $ci;
-				$info .="\n\n";	
-			}
-
-		} else {
-			$info .="No course information?!\n\n";	
-		}
-			$info .="\n"
-				  ."-------------------------------------------------------------------\n\n";
-			echo $info;
-			
+			return_info($getinfo);
 		}  
 		else if (!empty($options['fix'])) {
 			//var_dump($getinfo);	
 			
+			$fix1 = unequal_sequence($getinfo, empty($options['fix']));
 			$fix = find_same_then_similar_questiontext($getinfo, empty($options['fix']));
 			//var_dump($fix);
 			
@@ -1423,7 +1734,6 @@ foreach ($sequences2 as $sequence2) {
 	$ds = $sequence2->sequence;
 	//var_dump($ds);
 	$getinfo = get_sequence_info($ds, empty($options['info']));	
-	$print[] = $getinfo;
 	
 	if($getinfo && !empty($options['fix'])) {
 		//var_dump($getinfo);
@@ -1458,7 +1768,7 @@ echo "\n---------------------------------------------\n"
 
 
 ///////////////////////////////////////////////
-//If you have specified a question....
+//If you have specified a course....
 ///////////////////////////////////////////////
 if($options['course']) {
 	
@@ -1479,140 +1789,19 @@ foreach ($sqcourseqs1 as $courseq1) {
 	$ds = $courseq1->sequence;
 	//var_dump($ds);
 	$getinfo = get_sequence_info($ds, empty($options['info']));	
-	$print[] = $getinfo;
 	
 	if($getinfo) {		
 		if (!empty($options['info'])) {
-		//var_dump($getinfo);			
-			
-			$info="\n//////////////////////////////////////////////////////////////////\n"
-				 ."----- Sequence $getinfo[sequence] info -----\n"
-				 ."//////////////////////////////////////////////////////////////////\n\n"
-		 		 ."[ No. of questions using this sequence ]: $getinfo[duplicatecount]\n"
-				 ."[                  Those questions are ]: ";
-		
-		foreach($getinfo['duplicateids'] as $duplicates) {
-			$info .= $duplicates;
-			$info .= " ";					
-		}
-			
-			$info .="\n\n[ The following questions have been attempted ]: ";			
-		if(!empty($getinfo['attempted'])) { foreach($getinfo['attempted'] as $a) {
-			$info .= $a;
-			$info .= " ";	
-		}} 
-			$info .="\n\n/////////////////////////////////////";
-		if(!empty($getinfo['sqs_exist'])) {
-			$info .="\n\n[ SQs exist ]: ".implode(',', $getinfo['sqs_exist']);
-		} 
-		if(!empty($getinfo['sqs_missing'])) {
-			$info .="\n[ SQs MISSING ]: ".implode(',', $getinfo['sqs_missing']);
-		}
-		
-		
-		if((!empty($getinfo['similar'])) && ($getinfo['similar'][0] != $getinfo['sequence'])) { 
-			$info .="\n\n/////////////////////////////////////";
-			$info .="\n\n[ similar sequences ]: ";
-			foreach($getinfo['similar'] as $sim) {
-					$info .= $sim;
-					$info .= " | ";
-			}
-		
-			$info .= "\n\n[ No. of question using this other sequence ]: $getinfo[otherCount]";
-			$info .= "\n[ questions for similar sequences ]: ";
-			if(!empty($getinfo['otherQs'])) { foreach($getinfo['otherQs'] as $oq) {
-					$info .= $oq;
-					$info .= " ";
-			}}
-		
-			$info .="\n\n/////////////////////////////////////";
-		}
-			if(!empty($getinfo['parent'])) {
-			$info .="\n\n[ parent.q ]: $getinfo[parent]\n" 
-				   ."[  pq.name ]: $getinfo[pqname]\n"
-				   ."[  pq.text ]: $getinfo[pqtext]\n";
-			} else {
-			$info .="\n\n[ parent.q ]: NULL\n" 
-				   ."[  pq.name ]: NULL\n"
-				   ."[  pq.text ]: NULL\n";
-			}
-			
-//			$info .="\n\n[ quiz names ]:\n";
-//			if(!empty($getinfo['quiz'])) { foreach($getinfo['quiz'] as $qz) {
-//				$info .= "...";
-//				$info .= $qz;
-//				$info .="\n";
-//			}}			 
-			
-		if(!empty($getinfo['courseid']) && !empty($getinfo['quiz']) && !empty($getinfo['attempted'])) {
-			$info .="\n//////////////////////////\n";
-			$info .="\n\nInfo for just the attempted questions..."; 
-			$info .="\n[ questionid : courseid : coursename : quiz ]:\n\n";	
-			
-			$attmptd = new ArrayIterator(array_values($getinfo['attempted']));
-			$c_id = new ArrayIterator(array_values($getinfo['attemptedCourseID']));
-			$c_name = new ArrayIterator(array_values($getinfo['attemptedCourseName']));
-			$qz = new ArrayIterator(array_values($getinfo['attemptedQuiz']));						
-			
-			$courseinfos = new MultipleIterator;
-			$courseinfos->attachIterator($attmptd);
-			$courseinfos->attachIterator($c_id);
-			$courseinfos->attachIterator($c_name);
-			$courseinfos->attachIterator($qz);			
-						
-			$courseinfo = array();
-			foreach($courseinfos as $cinfo) {
-				$courseinfo[] = $cinfo[0].' --:-- '.$cinfo[1].' --:-- '.$cinfo[2].' --:-- '.$cinfo[3];
-			} 
-			//var_dump($courseinfo);
-			
-			foreach($courseinfo as $ci) {
-				$info .= "...";
-				$info .= $ci;
-				$info .="\n\n";	
-			}
-		} 
-		if (!empty($getinfo['courseid'])) {
-			$info .="\n//////////////////////////\n";
-			$info .="\n[ Questions that have NOT been attempted in any quizzes, but are in these courses and categories...]\n";	
-			$info .="\n[ question id : course id : course name : category...]\n\n";
-			
-			$q_id = new ArrayIterator(array_values($getinfo['duplicateids']));
-			$c_id = new ArrayIterator(array_values($getinfo['courseid']));
-			$c_name = new ArrayIterator(array_values($getinfo['course']));
-			$q_cat = new ArrayIterator(array_values($getinfo['category']));			
-			
-			$courseinfos = new MultipleIterator;
-			$courseinfos->attachIterator($q_id);
-			$courseinfos->attachIterator($c_id);
-			$courseinfos->attachIterator($c_name);
-			$courseinfos->attachIterator($q_cat);
-			
-			$courseinfo = array();
-			foreach($courseinfos as $cinfo) {
-				$courseinfo[] = $cinfo[0].' --:-- '.$cinfo[1].' --:-- '.$cinfo[2].' --:-- '.$cinfo[3];
-			} 
-			//var_dump($courseinfo);
-			
-			foreach($courseinfo as $ci) {
-				$info .= "...";
-				$info .= $ci;
-				$info .="\n\n";	
-			}
-
-		} else {
-			$info .="No course information?!\n\n";	
-		}
-			$info .="\n"
-				  ."-------------------------------------------------------------------\n\n";
-			echo $info;
-			
+		//var_dump($getinfo);	
+			//Insert function call...
+			return_info($getinfo);
 		}  
 		else if (!empty($options['fix'])) {
 			//var_dump($getinfo);	
 			
+			$fix1 = unequal_sequence($getinfo, empty($options['fix']));
 			$fix = find_same_then_similar_questiontext($getinfo, empty($options['fix']));
-			var_dump($fix);
+			//var_dump($fix);
 			
 			if(!empty($fix)) {				
 				if(!empty($fix['nosequence'])) {
@@ -1664,7 +1853,6 @@ foreach ($sqcourseqs2 as $courseqs2) {
 	$ds = $courseqs2->sequence;
 	//var_dump($ds);
 	$getinfo = get_sequence_info($ds, empty($options['info']));	
-	$print[] = $getinfo;
 	
 	if($getinfo && !empty($options['fix'])) {
 		//var_dump($getinfo);
@@ -1698,62 +1886,6 @@ echo "\n---------------------------------------------------------------\n"
 }
 
 
-
-//var_dump($print);
-//Put this info in a file if you want to keep it...
-//was hoping this would break the file up into separate ones, but it didn't...
-function writeToCSV($array) {
-    $i = 1;
-    $j = 1;
-    $fp = fopen('badsequences' . $j . '.csv', 'w');
-	fputcsv($fp, array('sequence',"\t",'DupeQs',"\t",'DupeCount',"\t",'attempted',"\t",'categories',"\t",'courseids',"\t",'courses',"\t",'quiz',"\t",'SequencesExist',"\t",'SequencesMissing',"\t",'ParentQ',"\t",'PQname',"\t",'PQtext'));
-	$printthis = array();
-    foreach($array as $fields => $value) {
-		foreach($value as $gimme => $more) {
-			$printthis[] = json_encode($more);
-		}
-		$printthis[] .= "\n";
-    }
-	if ($i % 1000 == 0) {
-		fclose($fp);
-		$fp = fopen('badsequences' . $j . '.csv', 'w');
-		$j = $j + 1;
-	}
-	fputcsv($fp, $printthis, "\t");
-	$i = $i + 1;
-    fclose($fp);
-}
-//writeToCSV($print);
-
-//Just get the DISTINCT courses that will be affected...
-function writeToCSV2($array) {
-    $i = 1;
-    $j = 1;
-    $fp = fopen('affectedcourses' . $j . '.csv', 'w');
-	$printthis = array();
-    foreach($array as $fields) {
-		$course = $fields['course'];
-		if(!empty($course)) {
-		foreach($course as $gimme => $value) {
-			$printthis[] = $value ."\n";
-		}
-		}
-		//var_dump($printthis);
-    }
-	//var_dump($printthis);
-	$printthis[] .= "\n";
-	if ($i % 1000 == 0) {
-		fclose($fp);
-		$fp = fopen('affectedcourses' . $j . '.csv', 'w');
-		$j = $j + 1;
-	}
-	fputcsv($fp, $printthis, "\t");
-	$i = $i + 1;
-    fclose($fp);
-}
-//writeToCSV2($print);
-
-//$showmeinfo = array();
 
 if(!empty($options['fix'])) {
 	echo "\n";	
