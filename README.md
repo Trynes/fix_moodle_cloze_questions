@@ -1,6 +1,12 @@
 # fix_moodle_cloze_questions
 An admin/cli script to fix corrupt Moodle cloze questions
 
+
+
+IMPORTANT: Script is undergoing further work. Do not use just yet!
+
+
+
 ----------------------------------------------------------------------------------------------
 DISCLAIMER: 
 This is not a Moodle-sanctioned script! Moodle.org have nothing to do with this.
