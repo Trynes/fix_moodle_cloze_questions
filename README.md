@@ -79,25 +79,22 @@ If all the questions in the first column were <b>correct</b>, however, they woul
 <strong>To fix this, version 2 (ICT_fix_multianswer_question_v2.php) of the script will do the following...</strong>
 
 <b>1.</b> Find all questions in the mdl_question_multianswer table in the DB for incorrect/invalid sequences; 
-i.e. sequence is null, or ',,,,' (no subquestions listed, or only commas).
-<br>
-If any questions have an EMPTY/INVALID sequence, it will update the sequence to '0'.
-This is to ensure courses don't fail on import when it can't find the seqeunce questions.
+i.e. sequence is null, or ',,,,' (no subquestions listed, or only commas). If any questions have an EMPTY/INVALID sequence, it will update the sequence to '0'. Don't worry about that though, it will be fixed shortly. It's mostly just to stop courses failing import while the fix is running (if you're doing it while not in maintenance mode).
 <br>
 
 <b>2.</b> Find and strip ALL HTML (except for img filenames) from multianswer questiontext and then stick all of the results into an array, grouped by stripped questiontext. This is helpful when running the fix.
 <br>
 
-<b>3a.</b> If ALL sequence questions exist, it will duplicate those sequence questions and then assign those new ids to the main questions that are NOT the parent of the original sequence questions. This will make all those results in the first SQL example above look like the results from the second example SQL.
+<b>3a.</b> If ALL sequence questions exist, and the question has equal cloze placeholders to the amount of sequence questions there are, it will duplicate those sequence questions and then assign those new ids to the main questions that are NOT the parent of the original sequence questions. This will make all those results in the first SQL example above look like the results from the second example SQL.
 <br>
 
-<b>3b.</b> If NONE of the sequence questions exist, it will see if this same question text has a viable result, and will then replace the sequence with a working one. It will then complete step 3a.
+<b>3b.</b> If NONE of the sequence questions exist, it will see if this same question text has a viable result (easy, because the questions are grouped by question text), and will then replace the sequence with a working one. It will then go through step 3a.
 <br>
 
-<b>4.</b> Once the questions all have new sequence questions (and answers in the mdl_question_answers table), it will then go through and fix any attempts that might have been made on these questions, assigning the new sequence question answers to the attempts so that you don't get 'the answer was changed after attempt' (or whatever the message is).
+<b>4.</b> Once the questions all have new sequence questions (and answers in the mdl_question_answers table, and matching questions in the numerical, multichoice, and short answer tables), it will then go through and fix any attempts that might have been made on these questions, assigning the new sequence question answers to the attempts so that you don't get 'the answer was changed after attempt' (or whatever the message is).
 <br>
 
-<b>5.</b> Bingo, presto, all is good. You can tee the results into an .html file that is fairly easy to read. The file might need to be manually broken into separate files, however. Mine was a very large file!
+<b>5.</b> Bingo, presto, all is good. You can tee the results into an .html file that is fairly easy to read. The file might need to be manually broken into separate files, however. Mine was a very large file! I've included an example of what that html file will look like in the files area.
 
 ----------------------------------------------------------------------------------------------
 IMPORTANT REMINDER: This script will run for a long time on big systems if called for all 
@@ -111,37 +108,25 @@ questions.
 
 <b>From the server console:</b>
 
-2. You can get information on QUESTIONS that might have more than one sequence match by running:
+2. You can get information on the multianswer QUESTIONS by running (subsititute whatever parts you need to fit your system. This was run on a machine running SUSE/Linux):
     
-    <b>ALL questions</b>
-    <br>sudo -u www-data /usr/bin/php admin/cli/fix_multianswer_sequences.php --questions=* --info
+    <b>ALL questions, tee into a html file and show on screen at the same time...</b>
+    <br>sudo -u www-data /usr/bin/php admin/cli/ICT_fix_multianswer_questions_v2.php --questions=* --info --verbose 2>&1 | tee INFO_VERBOSE_Multianswer_ALL.html
 
     <b>a few</b> questions:
-    <br>sudo -u www-data /usr/bin/php admin/cli/fix_multianswer_sequences.php --questions=123456,223344,445566 --info
+    <br>sudo -u www-data /usr/bin/php admin/cli/fix_multianswer_sequences.php --questions=123456,223344,445566 --info --verbose
 
     <b>a single</b> question:
-    <br>sudo -u www-data /usr/bin/php admin/cli/fix_multianswer_sequences.php --questions=123456 --info
-  
-3. Now, to run the fix:
-  <br>sudo -u www-data /usr/bin/php admin/cli/fix_multianswer_sequences.php --questions=* --fix
-  <br>sudo -u www-data /usr/bin/php admin/cli/fix_multianswer_sequences.php --questions=123456,223344,445566 --fix
-  <br>sudo -u www-data /usr/bin/php admin/cli/fix_multianswer_sequences.php --questions=123456 --fix
-
-<br>
-OR, if you would like to check a COURSE in particular:
-
-2. You can get information on COURSES that might have more than one sequence match by running:
+    <br>sudo -u www-data /usr/bin/php admin/cli/fix_multianswer_sequences.php --questions=123456 --info --verbose
     
-    <b>ALL courses</b>
-    <br>sudo -u www-data /usr/bin/php admin/cli/fix_multianswer_sequences.php --course=* --info
-
-    <b>a few</b> ourses:
-    <br>sudo -u www-data /usr/bin/php admin/cli/fix_multianswer_sequences.php --course=123456,223344,445566 --info
-
-    <b>a single</b> ourses:
-    <br>sudo -u www-data /usr/bin/php admin/cli/fix_multianswer_sequences.php --course=123456 --info
+    <b>only broken</b> questions (leave out --verbose):
+    <br>sudo -u www-data /usr/bin/php admin/cli/ICT_fix_multianswer_questions_v2.php --questions=* --info 2>&1 | tee INFO_Multianswer_BROKEN_ONLY.html
   
-3. Now, to run the fix:
-  <br>sudo -u www-data /usr/bin/php admin/cli/fix_multianswer_sequences.php --course=* --fix
-  <br>sudo -u www-data /usr/bin/php admin/cli/fix_multianswer_sequences.php --course=123456,223344,445566 --fix
-  <br>sudo -u www-data /usr/bin/php admin/cli/fix_multianswer_sequences.php --course=123456 --fix
+3. Now, to run the fix (it will output the info part as well just for reference. Remember, you can leave off the --verbose part to just show the broken questions):
+  <br>sudo -u www-data /usr/bin/php admin/cli/fix_multianswer_sequences.php --questions=* --fix --verbose
+  <br>sudo -u www-data /usr/bin/php admin/cli/fix_multianswer_sequences.php --questions=123456,223344,445566 --fix --verbose
+  <br>sudo -u www-data /usr/bin/php admin/cli/fix_multianswer_sequences.php --questions=123456 --fix --verbose
+
+If you want to tee it into a file, just add: 2>&1 | tee FIX_VERBOSE_Multianswer_ALL.html
+
+If you have any question/comments, feel free to create an issue (if you can). Or email me. I assume that info is on here somewhere?
