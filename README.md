@@ -11,12 +11,8 @@ IMPORTANT: Script is mostly complete. Running full 'fix' now. Will get back with
 DISCLAIMER: 
 This is not a Moodle-sanctioned script! Moodle.org have nothing to do with this.
 ----------------------------------------------------------------------------------------------
-This script works for Moodle 3.3.9, with a Postgres 9 database. You can test it on other systems, but I give no guarantees that it will work as expected.<br>
-I highly suggest testing it first on a copy of your system to ensure it doesn't corrupt your whole questions database,
-not that I think it should! I've run it against a few courses in our system and nothing untoward has happened so far!
 
-I suggest, if you DO use it on your production instance, that you also test it against a few courses first.
-NOTE: if you fix ONE course, it will likely affect other courses, since that is the nature of the beast!
+This script works for Moodle 3.3.9, with a Postgres 9 database. You can test it on other systems, but I give no guarantees that it will work as expected. I highly suggest testing it first on a copy of your system to ensure it doesn't corrupt your whole questions database, not that I think it should! 
 
 ----------------------------------------------------------------------------------------------
 IMPORTANT: This script will run for a long time on big systems if called for all questions.
