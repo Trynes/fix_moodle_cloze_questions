@@ -1,0 +1,105 @@
+<p>No questions have only commas for a sequence. This is a good thing...</p>
+
+<!doctype html><html><head><meta charset="utf-8"><title>Multianswer Questions</title>
+
+<style>
+
+table {
+			border: 1px solid #CBCBCB;
+			width: 100%;
+			max-width: 100%;
+			font-family: arial;
+			font-size: 90%;
+			border-collapse: collapse;
+			}				
+			th {
+				background-color: #e8e8e8;
+				vertical-align: top;
+			}
+			th, td {
+				border: 1px solid #CBCBCB;
+				padding: 8px 16px;		
+			}
+			tr {vertical-align: top;}
+		  .green {
+			background-color: #7CFC00; 
+			padding: 2px 5px;
+			font-weight: bold;
+		  }
+		  .red {
+			background-color: #e697b0; 
+			padding: 2px 5px;
+			font-weight: bold;
+		  }
+		  .wrap {word-break: break-all;} .dodgy {display: table-row;}.good {display: table-row;}.hide {display: none;}.box {border: 1px solid #ccc; padding: 60px; width:50%; margin: 0 auto;}.clearer {clear:both; display:block; width:100%;}button {padding: 5px; margin-bottom: 10px;}</style><script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script><script type="text/javascript">
+			$(document).ready(function () {
+			$("button[class^=table]").on("click", function () {
+				var id = this.className;
+				var rows = $("table." + id + " tr.good");
+
+				if( $(rows).hasClass("good") ) {
+					if( $(rows).hasClass("hide") ) {
+						$(rows).removeClass("hide")
+					} else {
+						$(rows).addClass("hide")
+					}
+				} 
+			});	
+		});
+		$(document).ready(function () {
+			$("[id=hideall]").on("click", function () {	
+				var rows = $("tr.good");		
+
+				if( $(rows).hasClass("hide") ) {
+					$(rows).removeClass("hide")
+				} else {
+					$(rows).addClass("hide")
+				}
+			});	
+		});
+		</script></head>
+
+<body><button id="hideall">Hide/Show ALL Good Rows</button>
+
+<div class="clearer"></div><div class="box"><h1 style="text-align: center;">------------------------- Question info ---------------------------</h1>
+<p><b>[ The stripped question text is ]:</b></p><p style="word-wrap:break-word">Selectthecorrectnameforthetool:{{{img:TapeMeasurejpg}}}{#1}{{{img:TapeMeasurejpg}}}{#6}imgsrchttp://eldev8citeduau/filephp/31371/ToolboxofTools/BoltCuttersJPGalttooltitletoolborder0hspace0vspace0width170height170/{#7}imgsrchttp://eldev8citeduau/filephp/31371/ToolboxofTools/EarprotectionJPGalttooltitletoolborder0hspace0vspace0width170height170/{#8}imgsrchttp://eldev8citeduau/filephp/31371/ToolboxofTools/crosspeinhammerJPGalttooltitletoolborder0hspace0vspace0width170height170/{#9}</p>
+
+<hr>
+
+<p><b>[     Placeholders ]:</b> 5</p>
+
+<p><b>[ No. of questions ]:</b> 1</p>
+
+<hr></div><br><table class="table1"><tbody><tr><th scope="col">Q id</th><th scope="col">Q name</th><th scope="col">course</th><th scope="col">Q category</th><th scope="col">quiz</th><th scope="col">attempted</th><th scope="col">sequence</th><th scope="col">parent Q</th><th scope="col">usage</th><th scope="col">equality</th><th scope="col">all Qs exist?</th><th scope="col">similar sequence</th></tr>
+<button class="table1">Hide/Show Good Rows</button><tr class="dodgy">
+<td title="questionid">1414474</td>
+<td title="questionname">Tool Terminology - Set 8</td>
+<td title="course">Carpentry MASTER</td>
+<td title="qcategory">Default for Use Carpentry Tools and Equipment MASTER</td>
+<td title="quiz">23102 : Tool Identification</td>
+<td title="attempted">no</td>
+<td title="sequence" class="wrap"><span class="red">0</span></td>
+<td title="parent">0</td>
+<td title="usage"><span class="red">11814</span></td>
+<td title="equality"><span class="red">no</span></td>
+<td title="all Qs exist"><span class="red">no</span></td>
+<td title="other sequence"></td>
+</tr>
+</tbody></table><br>
+
+<div class="clearer"></div><div class="box"><hr>
+<p>Updating sequence on dodgy questions to a viable sequence or 0...</p>
+<hr>
+<p class="red">Sequence for question [ 1414474 ] is already 0 and there are no other questions for this questiontext with a viable sequence.<br>
+
+You will need to fix this question manually.</p>
+
+</div>
+<div class="clearer"></div></body></html><hr>
+<p>Done!</p>
+<hr>
+
+<p>Fails:</p>
+<p>...[1] question(s) could not be fixed and requires manual intervention.</p>
+
+<p>Successes:</p>

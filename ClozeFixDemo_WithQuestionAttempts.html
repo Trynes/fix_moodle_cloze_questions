@@ -1,0 +1,201 @@
+<p>No questions have only commas for a sequence. This is a good thing...</p>
+
+<!doctype html><html><head><meta charset="utf-8"><title>Multianswer Questions</title>
+
+<style>
+
+table {
+			border: 1px solid #CBCBCB;
+			width: 100%;
+			max-width: 100%;
+			font-family: arial;
+			font-size: 90%;
+			border-collapse: collapse;
+			}				
+			th {
+				background-color: #e8e8e8;
+				vertical-align: top;
+			}
+			th, td {
+				border: 1px solid #CBCBCB;
+				padding: 8px 16px;		
+			}
+			tr {vertical-align: top;}
+		  .green {
+			background-color: #7CFC00; 
+			padding: 2px 5px;
+			font-weight: bold;
+		  }
+		  .red {
+			background-color: #e697b0; 
+			padding: 2px 5px;
+			font-weight: bold;
+		  }
+		  .wrap {word-break: break-all;} .dodgy {display: table-row;}.good {display: table-row;}.hide {display: none;}.box {border: 1px solid #ccc; padding: 60px; width:50%; margin: 0 auto;}.clearer {clear:both; display:block; width:100%;}button {padding: 5px; margin-bottom: 10px;}</style><script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script><script type="text/javascript">
+			$(document).ready(function () {
+			$("button[class^=table]").on("click", function () {
+				var id = this.className;
+				var rows = $("table." + id + " tr.good");
+
+				if( $(rows).hasClass("good") ) {
+					if( $(rows).hasClass("hide") ) {
+						$(rows).removeClass("hide")
+					} else {
+						$(rows).addClass("hide")
+					}
+				} 
+			});	
+		});
+		$(document).ready(function () {
+			$("[id=hideall]").on("click", function () {	
+				var rows = $("tr.good");		
+
+				if( $(rows).hasClass("hide") ) {
+					$(rows).removeClass("hide")
+				} else {
+					$(rows).addClass("hide")
+				}
+			});	
+		});
+		</script></head>
+
+<body><button id="hideall">Hide/Show ALL Good Rows</button>
+
+<div class="clearer"></div><div class="box"><h1 style="text-align: center;">------------------------- Question info ---------------------------</h1>
+<p><b>[ The stripped question text is ]:</b></p><p style="word-wrap:break-word">Theratioofvoltageovercurrentonapurelycapacitivecircuitiscalled{#1}andhastheunitsof{#2}</p>
+
+<hr>
+
+<p><b>[     Placeholders ]:</b> 2</p>
+
+<p><b>[ No. of questions ]:</b> 2</p>
+
+<hr></div><br><table class="table1"><tbody><tr><th scope="col">Q id</th><th scope="col">Q name</th><th scope="col">course</th><th scope="col">Q category</th><th scope="col">quiz</th><th scope="col">attempted</th><th scope="col">sequence</th><th scope="col">parent Q</th><th scope="col">usage</th><th scope="col">equality</th><th scope="col">all Qs exist?</th><th scope="col">similar sequence</th></tr>
+<button class="table1">Hide/Show Good Rows</button><tr class="dodgy">
+<td title="questionid">6530003</td>
+<td title="questionname">AC3 w4quiz 5 SA Xc ==V/i in purely C circuit</td>
+<td title="course">XLSGX201620: 64099 65060</td>
+<td title="qcategory">Revisison quiz for week 3</td>
+<td title="quiz">82292 : Review QUIZ for week 3</td>
+<td title="attempted"><span class="green">yes</span></td>
+<td title="sequence" class="wrap">6530000,6529999</td>
+<td title="parent"><span class="red">none</span></td>
+<td title="usage"></td>
+<td title="equality">yes</td>
+<td title="all Qs exist"><span class="red">no</span></td>
+<td title="other sequence"></td>
+</tr>
+<tr class="good">
+<td title="questionid">11522429</td>
+<td title="questionname">AC3 w4quiz 5 SA Xc ==V/i in purely C circuit</td>
+<td title="course">XLSGP201820: 11316 11322 11326 11330</td>
+<td title="qcategory">Revisison quiz for week 3</td>
+<td title="quiz">--</td>
+<td title="attempted">no</td>
+<td title="sequence" class="wrap">12742752,12742753</td>
+<td title="parent">11522429</td>
+<td title="usage"></td>
+<td title="equality">yes</td>
+<td title="all Qs exist">yes</td>
+<td title="other sequence"></td>
+</tr>
+</tbody></table><br>
+
+<div class="clearer"></div><div class="box"><hr>
+<p>Updating sequence on dodgy questions to a viable sequence or 0...</p>
+<hr>
+<p class="green">Sequence for question [ 6530003 ] was updated to [ 12742752,12742753 ]</p>
+
+</div>
+<div class="clearer"></div><div class="clearer"></div><div class="box">
+<hr><p>Attempting to fix questions that have a parent and all subquestions.<br>
+		  If successful, will duplicate subquestions and assign new sequence and fix attempts.</p>
+<hr>
+<h3>Fixing question: [ 6530003 ]</h3>
+
+<p>Duplicating sequence question [ 12742752 ]</p>
+
+<p>...Added new <b>question</b> to the database with id: 14793854</p>
+<p>
+...Added new <b>question_answer</b> to the database for Q [ 14793854 ] with id: 31809069<br>
+</p>
+</p>
+
+<p>...Added new <b>qtype_shortanswer_options</b> to the database with id: 1045193</p>
+<p>Duplicating sequence question [ 12742753 ]</p>
+
+<p>...Added new <b>question</b> to the database with id: 14793855</p>
+<p>
+...Added new <b>question_answer</b> to the database for Q [ 14793855 ] with id: 31809070<br>
+
+...Added new <b>question_answer</b> to the database for Q [ 14793855 ] with id: 31809071<br>
+</p>
+</p>
+
+<p>...Added new <b>qtype_shortanswer_options</b> to the database with id: 1045194</p>
+
+<p>Sequence for question [ 6530003 ] was [ 12742752,12742753 ]</p>
+<p class="green"><b>Updated sequence for [ 6530003 ] to [ 14793854,14793855 ]</b></p>
+<hr>
+<h3>Attempt Information (just in case you need it):</h3>
+<p>Attempt id      : [ 11898348 ]</p>
+<p>Right Answer    : [ part 1: CAPACITIVE REACTANCE; part 2: OHMS ]</p>
+<p>Response Summary: [ part 1: ; part 2:  ]</p>
+<br><p>Attempt id      : [ 11898440 ]</p>
+<p>Right Answer    : [ part 1: CAPACITIVE REACTANCE; part 2: OHMS ]</p>
+<p>Response Summary: [ part 1: capacitive reactance; part 2: ohms ]</p>
+<br><hr>
+</div><div class="clearer"></div><h1 style="text-align:center;">Updated info:</h1>
+<div class="clearer"></div><div class="box"><h1 style="text-align: center;">------------------------- Question info ---------------------------</h1>
+<p><b>[ The stripped question text is ]:</b></p><p style="word-wrap:break-word">Theratioofvoltageovercurrentonapurelycapacitivecircuitiscalled{#1}andhastheunitsof{#2}</p>
+
+<hr>
+
+<p><b>[     Placeholders ]:</b> 2</p>
+
+<p><b>[ No. of questions ]:</b> 2</p>
+
+<hr></div><br><table class="table1"><tbody><tr><th scope="col">Q id</th><th scope="col">Q name</th><th scope="col">course</th><th scope="col">Q category</th><th scope="col">quiz</th><th scope="col">attempted</th><th scope="col">sequence</th><th scope="col">parent Q</th><th scope="col">usage</th><th scope="col">equality</th><th scope="col">all Qs exist?</th><th scope="col">similar sequence</th></tr>
+<button class="table1">Hide/Show Good Rows</button><tr class="good">
+<td title="questionid">6530003</td>
+<td title="questionname">AC3 w4quiz 5 SA Xc ==V/i in purely C circuit</td>
+<td title="course">XLSGX201620: 64099 65060</td>
+<td title="qcategory">Revisison quiz for week 3</td>
+<td title="quiz">82292 : Review QUIZ for week 3</td>
+<td title="attempted"><span class="green">yes</span></td>
+<td title="sequence" class="wrap">14793854,14793855</td>
+<td title="parent">6530003</td>
+<td title="usage"></td>
+<td title="equality">yes</td>
+<td title="all Qs exist">yes</td>
+<td title="other sequence"></td>
+</tr>
+<tr class="good">
+<td title="questionid">11522429</td>
+<td title="questionname">AC3 w4quiz 5 SA Xc ==V/i in purely C circuit</td>
+<td title="course">XLSGP201820: 11316 11322 11326 11330</td>
+<td title="qcategory">Revisison quiz for week 3</td>
+<td title="quiz">--</td>
+<td title="attempted">no</td>
+<td title="sequence" class="wrap">12742752,12742753</td>
+<td title="parent">11522429</td>
+<td title="usage"></td>
+<td title="equality">yes</td>
+<td title="all Qs exist">yes</td>
+<td title="other sequence"></td>
+</tr>
+</tbody></table><br>
+
+</body></html><hr>
+<p>Done!</p>
+<hr>
+
+<p>Fails:</p>
+
+<p>Successes:</p>
+<p>...[1] questions had new, viable sequences applied.</p>
+<p>...[2] new sub/sequence questions were added to the mdl_question table.</p>
+<p>...[3] new question answers were added to the mdl_question_answers table.</p>
+<p>...[0] new numerical questions were added to the mdl_question_numerical table.</p>
+<p>...[0] new multi-choice questions were added to the mdl_qtype_multichoice_options table.</p>
+<p>...[2] new short-answer questions were added to the mdl_qtype_shortanswer_options table.</p>
