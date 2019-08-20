@@ -118,7 +118,16 @@ questions.
     <b>only broken</b> questions (leave out --verbose):
     <br>sudo -u www-data /usr/bin/php admin/cli/ICT_fix_multianswer_questions_v2.php --questions=* --info 2>&1 | tee INFO_Multianswer_BROKEN_ONLY.html
   
-3. Now, to run the fix (it will output the info part as well just for reference. Remember, you can leave off the --verbose part to just show the broken questions):
+3. Now, to run the fix:
+
+(This will output the info part as well just for reference. It will do this twice. Once to show the intial information, and then again to show the updated information. Remember, you can leave off the --verbose part to just show the broken questions):
+
+----------------------------------------------------------------------------------------------
+IMPORTANT: If you run the fix for just 1 question that needs a more viable sequence first, 
+you will need to include the question id of another question that has a viable sequence.
+If you run it for 1 question that just has the wrong parent only, it will work fine.
+----------------------------------------------------------------------------------------------
+
   <br>sudo -u www-data /usr/bin/php admin/cli/fix_multianswer_sequences.php --questions=* --fix --verbose
   <br>sudo -u www-data /usr/bin/php admin/cli/fix_multianswer_sequences.php --questions=123456,223344,445566 --fix --verbose
   <br>sudo -u www-data /usr/bin/php admin/cli/fix_multianswer_sequences.php --questions=123456 --fix --verbose
