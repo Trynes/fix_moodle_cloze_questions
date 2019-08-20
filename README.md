@@ -134,4 +134,6 @@ If you run it for 1 question that just has the wrong parent only, it will work f
 
 If you want to tee it into a file, just add: 2>&1 | tee FIX_VERBOSE_Multianswer_ALL.html
 
+----------------------------------------------------------------------------------------------
 If you have any question/comments, feel free to create an issue (if you can). Or email me. I assume that info is on here somewhere?
+----------------------------------------------------------------------------------------------
