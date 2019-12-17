@@ -4,6 +4,12 @@ An admin/cli script to fix corrupt Moodle cloze questions
 
 ----------------------------------------------------------------------------------------------
 IMPORTANT: Script is mostly complete. Running full 'fix' now. Will get back with results soon.
+UPDATE: Ran it for over 100,000 questions. Worked really well. Fixed everything, though 1 issue came
+up: Someone had edited a cloze question and changed it from multichoice cloze choices to 
+short answer instead. This caused the answers to come up as 0 or 1 instead of the correct answer.
+Not a huge problem. You can just go into the database and fix this, but if you want to add a 
+check to this script first to make sure the questiontype is the same before doing a replace,
+do feel free!
 ----------------------------------------------------------------------------------------------
 
 
