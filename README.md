@@ -1,15 +1,16 @@
-# fix_moodle_cloze_questions
+ fix_moodle_cloze_questions
 An admin/cli script to fix corrupt Moodle cloze questions
 
+November, 2021: Use version 3 of the script.
 
 ----------------------------------------------------------------------------------------------
-IMPORTANT: Script is mostly complete. Running full 'fix' now. Will get back with results soon.
-UPDATE: Ran it for over 100,000 questions. Worked really well. Fixed everything, though 1 issue came
-up: Someone had edited a cloze question and changed it from multichoice cloze choices to 
+IMPORTANT: There is still 1 issue unresolved with the script:
+Someone had edited a cloze question and changed it from multichoice cloze choices to 
 short answer instead. This caused the answers to come up as 0 or 1 instead of the correct answer.
-Not a huge problem. You can just go into the database and fix this, but if you want to add a 
-check to this script first to make sure the questiontype is the same before doing a replace,
-do feel free!
+Not a huge problem. You can just go into the database and fix this.
+
+If I get time or feel I really need to, I might add a check to this script first to make sure 
+the questiontype is the same before doing a replace.
 ----------------------------------------------------------------------------------------------
 
 
@@ -18,10 +19,16 @@ DISCLAIMER:
 This is not a Moodle-sanctioned script! Moodle.org have nothing to do with this.
 ----------------------------------------------------------------------------------------------
 
-This script works for Moodle 3.3.9, with a Postgres 9 database. You can test it on other systems, but I give no guarantees that it will work as expected. I highly suggest testing it first on a copy of your system to ensure it doesn't corrupt your whole questions database, not that I think it should! 
+This script works for Moodle 3.3.x - 3.9.x, with a Postgres 9 database. You can test it on 
+other systems, but I give no guarantees that it will work as expected. I highly suggest testing 
+it first on a copy of your system to ensure it doesn't corrupt your whole questions database, 
+not that I think it should! 
 
 ----------------------------------------------------------------------------------------------
-IMPORTANT: This script will run for a long time on big systems if called for all questions.
+IMPORTANT: This script will run for a long time on big systems if called for all questions (--verbose).
+It's much quicker if you leave off the '--verbose' option but that may leave a few questions unfixed.
+I suggest running without it first and then seeing what else needs fixing afterwards.
+
 I suggest you run it while in maintenance mode as another user may simultaneously edit one of the 
 questions being checked/fixed and cause more problems, but it's not essential.
 ----------------------------------------------------------------------------------------------
@@ -78,10 +85,10 @@ If all the questions in the first column were <b>correct</b>, however, they woul
 <b>Why is this a problem?</b> Because if someone deletes the parent question '3758257', every other question with the sequence '2783831,2783832,2783833' will now have NO sequence questions listed and this will cause an error within Moodle! If you check the mdl_question_multianswer table for the question, you will find it now likely has a sequence of ',,' instead.
 
 <br><br>
-<strong>To fix this, version 2 (ICT_fix_multianswer_question_v2.php) of the script will do the following...</strong>
+<strong>To fix this, version 3 (ICT_fix_multianswer_question_v3.php) of the script will do the following...</strong>
 
-<b>1.</b> Find all questions in the mdl_question_multianswer table in the DB for incorrect/invalid sequences; 
-i.e. sequence is null, or ',,,,' (no subquestions listed, or only commas). If any questions have an EMPTY/INVALID sequence, it will update the sequence to '0'. Don't worry about that though, it will be fixed shortly. It's mostly just to stop courses failing import while the fix is running (if you're doing it while not in maintenance mode).
+<b>1a.</b> Find all questions in the mdl_question_multianswer table in the DB for incorrect/invalid/duplicate sequences; 
+i.e. sequence is null, or ',,,,' (no subquestions listed, or only commas), or the same sequence is used by multiple questions. If any questions have an EMPTY/INVALID sequence, it will update the sequence to '0'. Don't worry about that though, it will be fixed shortly. It's mostly just to stop courses failing import while the fix is running (if you're doing it while not in maintenance mode).
 <br>
 
 <b>2.</b> Find and strip ALL HTML (except for img filenames) from multianswer questiontext and then stick all of the results into an array, grouped by stripped questiontext. This is helpful when running the fix.
@@ -106,23 +113,23 @@ questions.
 
 <b>HOW TO USE:</b>
 
-1. Copy the file to moodle/admin/cli; 
+1. Copy the file to moodle/admin/cli/scripts (or whatever else you want to call the folder. You could just add it in with the rest, but then you'll need to change require(__DIR__.'/../../../config.php') to remove a /..;) 
 
 <b>From the server console:</b>
 
 2. You can get information on the multianswer QUESTIONS by running (subsititute whatever parts you need to fit your system. This was run on a machine running SUSE/Linux):
     
-    <b>ALL questions, tee into a html file and show on screen at the same time...</b>
-    <br>sudo -u www-data /usr/bin/php admin/cli/ICT_fix_multianswer_questions_v2.php --questions=* --info --verbose 2>&1 | tee INFO_VERBOSE_Multianswer_ALL.html
+    <b>ALL</b> multianswer questions in the DB, tee into a html file and show on screen at the same time. This can take a long time if you have a lot of multianswer Qs.
+    <br>sudo -u www-data /usr/bin/php admin/cli/ICT_fix_multianswer_questions_v3.php --questions=* --info --verbose 2>&1 | tee INFO_VERBOSE_Multianswer_ALL.html
 
-    <b>a few</b> questions:
-    <br>sudo -u www-data /usr/bin/php admin/cli/fix_multianswer_sequences.php --questions=123456,223344,445566 --info --verbose
+     multianswer questions that have <b>duplicate sequences with same parent</b>, tee into a html file and show on screen at the same time...(don't use --verbose)
+    <br>sudo -u www-data /usr/bin/php admin/cli/ICT_fix_multianswer_questions_v3.php --questions=* --info 2>&1 | tee INFO_Multianswer.html
 
-    <b>a single</b> question:
-    <br>sudo -u www-data /usr/bin/php admin/cli/fix_multianswer_sequences.php --questions=123456 --info --verbose
-    
-    <b>only broken</b> questions (leave out --verbose):
-    <br>sudo -u www-data /usr/bin/php admin/cli/ICT_fix_multianswer_questions_v2.php --questions=* --info 2>&1 | tee INFO_Multianswer_BROKEN_ONLY.html
+    <b>a few</b> questions only:
+    <br>sudo -u www-data /usr/bin/php admin/cli/fix_multianswer_questions_v3.php --questions=123456,223344,445566 --info --verbose
+
+    <b>a single</b> question only:
+    <br>sudo -u www-data /usr/bin/php admin/cli/fix_multianswer_questions_v3.php --questions=123456 --info --verbose
   
 3. Now, to run the fix:
 
@@ -134,11 +141,17 @@ you will need to include the question id of another question that has a viable s
 If you run it for 1 question that just has the wrong parent only, it will work fine.
 ----------------------------------------------------------------------------------------------
 
-  <br>sudo -u www-data /usr/bin/php admin/cli/fix_multianswer_sequences.php --questions=* --fix --verbose
-  <br>sudo -u www-data /usr/bin/php admin/cli/fix_multianswer_sequences.php --questions=123456,223344,445566 --fix --verbose
-  <br>sudo -u www-data /usr/bin/php admin/cli/fix_multianswer_sequences.php --questions=123456 --fix --verbose
+  <br>JUST THE BROKEN/DUPLICATE QUESTIONS...
 
-If you want to tee it into a file, just add: 2>&1 | tee FIX_VERBOSE_Multianswer_ALL.html
+- <br>sudo -u www-data /usr/bin/php admin/cli/fix_multianswer_questions_v3.php --questions=* --fix 2>&1 | tee FIX_cloze.html
+  <br>sudo -u www-data /usr/bin/php admin/cli/fix_multianswer_questions_v3.php --questions=123456,223344,445566 --fix 2>&1 | tee FIX_cloze.html
+  <br>sudo -u www-data /usr/bin/php admin/cli/fix_multianswer_questions_v3.php --questions=123456 --fix 2>&1 | tee FIX_cloze.html
+
+  <br>ALL OF THE MULTIANSWER QUESTIONS...
+
+  <br>sudo -u www-data /usr/bin/php admin/cli/fix_multianswer_questions_v3.php --questions=* --fix --verbose 2>&1 | tee FIX_cloze.html
+  <br>sudo -u www-data /usr/bin/php admin/cli/fix_multianswer_questions_v3.php --questions=123456,223344,445566 --fix --verbose 2>&1 | tee FIX_cloze.html
+  <br>sudo -u www-data /usr/bin/php admin/cli/fix_multianswer_questions_v3.php --questions=123456 --fix --verbose 2>&1 | tee FIX_cloze.html
 
 ----------------------------------------------------------------------------------------------
 If you have any question/comments, feel free to create an issue (if you can). Or email me. I assume that info is on here somewhere?

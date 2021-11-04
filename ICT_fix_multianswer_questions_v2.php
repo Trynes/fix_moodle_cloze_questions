@@ -1156,210 +1156,211 @@ function has_parent_and_all_subquestions_fix($parentquestion=null,$params=null,$
 		$attemptinfo = $DB->get_records_sql("SELECT * FROM {question_attempts} WHERE questionid = '$parentquestion'");
 
 		if(!empty($attemptinfo)) {
-		echo "<hr>\n";
-		echo "<h3>Attempt Information (just in case you need it):</h3>\n";
+			echo "<hr>\n";
+			echo "<h3>Attempt Information (just in case you need it):</h3>\n";
 
-		foreach($attemptinfo as $attempt) {
-			echo "<p>Attempt id      : [ ".$attempt->id." ]</p>\n";
-			echo "<p>Question Summary: [ ".$attempt->questionsummary." ]</p>\n";
-			echo "<p>Right Answer    : [ ".$attempt->rightanswer." ]</p>\n";
-			echo "<p>Response Summary: [ ".$attempt->responsesummary." ]</p>\n";
-			echo "<br>";
-		}}
+			foreach($attemptinfo as $attempt) {
+				echo "<p>Attempt id      : [ ".$attempt->id." ]</p>\n";
+				echo "<p>Question Summary: [ ".$attempt->questionsummary." ]</p>\n";
+				echo "<p>Right Answer    : [ ".$attempt->rightanswer." ]</p>\n";
+				echo "<p>Response Summary: [ ".$attempt->responsesummary." ]</p>\n";
+				echo "<br>";
+			}
+		}
 
 
 		if (!empty($attemptids)) {
-		//Get the correct answers/values for the sequence question from mdl_question_answers
-		//This will have the correct IDs needed for mdl_question_attempt_step_data...
+			//Get the correct answers/values for the sequence question from mdl_question_answers
+			//This will have the correct IDs needed for mdl_question_attempt_step_data...
 
-		//var_dump($sqs);
+			//var_dump($sqs);
 
-		//Weed out any question that isn't multichoice as they are the only ones
-		//that will need fixing. Absolutely must order by id! (otherwise it stuffs fixing attempts)...
-		$multichoice = array();
-		foreach($newSQs as $nsq) {
-			$multichoice[] = $DB->get_records_sql("SELECT id FROM {question} WHERE qtype = 'multichoice' AND id = $nsq ORDER BY id");
-		}
-		//var_dump($multichoice);
+			//Weed out any question that isn't multichoice as they are the only ones
+			//that will need fixing. Absolutely must order by id! (otherwise it stuffs fixing attempts)...
+			$multichoice = array();
+			foreach($newSQs as $nsq) {
+				$multichoice[] = $DB->get_records_sql("SELECT id FROM {question} WHERE qtype = 'multichoice' AND id = $nsq ORDER BY id");
+			} // End foreach newSQs as nsq
+			//var_dump($multichoice);
 
-		$newValues = array();
-		foreach($multichoice as $multi) {
-			//var_dump($multi);
-			if(!empty($multi)){
-			foreach($multi as $MC) {
-				$answers = $DB->get_records_sql("SELECT id,question FROM {question_answers} WHERE question = '$MC->id' ORDER BY question,id");
-	//			echo "----------------------------------------\n";
-	//			echo "Question Answer Group:\n";
-	//			echo "----------------------------------------\n";
-				//var_dump($answers);
-				//Outputs array -> object X however many answer values there are (a few to each question)...
-				$values = array();
-				foreach($answers as $key => $item) {
-					//var_dump($item);
-					$values[] = $item->id;
-				}
-				//Now put those arrays into a newValues array...
-				$newValues[] = $values;
-			}
-			}
-		}
-//		echo "----------------------------------------\n";
-//		echo "New values:\n";
-//		echo "----------------------------------------\n";
-//		var_dump($newValues);
-
-		//Need to treat each attempt by itself, as some attempts might reference
-		//   different sequence questions! (If the cloze question has been edited before)...
-
-		foreach($attemptids as $attempt) {
-			//echo "----------------------------------------\n";
-			//echo "Attempt id: $attempt->id\n";
-			//echo "----------------------------------------\n";
-			//var_dump($attempt);
-			//Now get the attempt step ids for each of the question attempts where the state is todo.
-			//(The three states are: todo, complete, graded-right/partial/invalid). We need todo.
-			//We only need the id's, really...
-			$steps = $DB->get_records_sql("SELECT id FROM {question_attempt_steps} WHERE state = 'todo' AND questionattemptID = $attempt->id");
-			//var_dump($steps);
-
-			//Sometimes there is no 'todo' so you have to take the first 'complete' instead!
-			if (empty($steps)) {
-				$steps = $DB->get_records_sql("SELECT id FROM {question_attempt_steps} WHERE state = 'complete' AND questionattemptID = $attempt->id ORDER BY id LIMIT 1");
-			}
-
-
-			//Need to treat each step separately...
-			//echo "----------------------------------------\n";
-			//echo "New Loop: ";
-			//echo "----------------------------------------\n";
-			foreach($steps as $step) {
-			//var_dump($step);
-				$stepx = $step->id;
-
-				//Now we need the step data so we can change the values in the value column.
-				//But we only need the ones that are _sub?_order...
-				//Had it ordered by name, but if there were more than 10 of them, the order got screwed up (_sub10_order, sub1_order, etc)
-				//By id seemed to work. But in some cases, the order was screwed up.
-				//Finally found this...
-				$stepdata = $DB->get_records_sql("SELECT * FROM {question_attempt_step_data} WHERE name LIKE '%_order' AND attemptstepid = '$stepx' ORDER BY NULLIF(regexp_replace(name, '\D', '', 'g'), '')::int");
-				//var_dump($stepdata);
-				//Outputs array -> object X however many _sub_order values there are...
-
-				$oldValues = array();
-				$oldValuesArray = array();
-				foreach($stepdata as $key => $item) {
-					//Get the oldValues as an array of string values...
-					$oldValues[] = $item->value;
-					//explode the strings into an array for the replacement list...
-					$oldValuesArray[] = explode(',', $item->value);
-				}
-//				echo "----------------------------------------\n";
-//				echo "Old values:\n";
-//				echo "----------------------------------------\n";
-//				var_dump($oldValues);
-
-				//Sort the oldValues from lowest->highest in their arrays...
-				//(Some values are shuffled, which will ruin the replacement)
-				$oldList = array();
-				foreach($oldValuesArray as $ov) {
-					sort($ov);
-					$oldList[] = $ov;
-				}
-//				echo "----------------------------------------\n";
-//				echo "Old List:\n";
-//				echo "----------------------------------------\n";
-//				var_dump($oldList);
-
-				//Now we need to create an array where the oldValue is the key
-				//And the newValue is the value (for the replacement function)...
-				$newV = new ArrayIterator(array_values($newValues));
-				$oldV = new ArrayIterator(array_values($oldList));
-
-				$result = new MultipleIterator;
-				$result->attachIterator($oldV);
-				$result->attachIterator($newV);
-
-	//			echo "Result: ";
-//				var_dump($result);
-
-				$replaceMArray = array();
-				//Combine the two arrays (oldValue is the key, newValue is the value...
-				foreach($result as $r) {
-//					echo "----------------------------------------\n";
-//					echo "results as r :\n";
-//					echo "----------------------------------------\n";
-//					var_dump($r);
-					//Make sure both arrays have the same number of elements
-					//If not, it means some question-parts were deleted after attempts were made...
-					if(sizeof($r[0]) == sizeof($r[1])) {
-						$replaceMArray[] = array_combine($r[0],$r[1]);
-					} else {
-						//This shouldn't happen now, but if it does...
-
-						echo '<p class="red">Error: Your replacement arrays are not equal for attempt:'.$attempt->id."<br>\n";
-						echo "Make sure no sequence questions are missing for Q [ $parentquestion ] and try again.</p>\n";
-
-					};
-				}
-				//var_dump($replaceMArray);
-
-				//Now make sure the $replaceMArray is not empty before doing the replacement....
-				if(!empty($replaceMArray)) {
-					//Iterate over the replaceArray so we can flatten the multi array into one...
-					$values = new RecursiveIteratorIterator(new RecursiveArrayIterator($replaceMArray));
-
-					//Reassign the key->value relationship...
-					$replace = array();
-					foreach($values as $key => $item) {
-						$replace[$key] = $item;
+			$newValues = array();
+			foreach($multichoice as $multi) {
+				//var_dump($multi);
+				if(!empty($multi)){
+					foreach($multi as $MC) {
+						$answers = $DB->get_records_sql("SELECT id,question FROM {question_answers} WHERE question = '$MC->id' ORDER BY question,id");
+						// echo "----------------------------------------\n";
+						// echo "Question Answer Group:\n";
+						// echo "----------------------------------------\n";
+						//var_dump($answers);
+						//Outputs array -> object X however many answer values there are (a few to each question)...
+						$values = array();
+						foreach($answers as $key => $item) {
+							//var_dump($item);
+							$values[] = $item->id;
+						}
+						//Now put those arrays into a newValues array...
+						$newValues[] = $values;
 					}
-					//Now we have our replacement values!
-	//				echo "----------------------------------------\n";
-	//				echo "Replacement values:\n";
-	//				echo "----------------------------------------\n";
-	//				var_dump($replace);
+				}
+			}// End foreach multichoice as multi
+			// echo "----------------------------------------\n";
+			// echo "New values:\n";
+			// echo "----------------------------------------\n";
+			// var_dump($newValues);
 
-					$result = array();
-					foreach($oldValues as $old) {
-						//var_dump($old);
-						$result[] = strtr($old, $replace);
+			//Need to treat each attempt by itself, as some attempts might reference
+			//different sequence questions! (If the cloze question has been edited before)...
+
+			foreach($attemptids as $attempt) {
+				//echo "----------------------------------------\n";
+				//echo "Attempt id: $attempt->id\n";
+				//echo "----------------------------------------\n";
+				//var_dump($attempt);
+				//Now get the attempt step ids for each of the question attempts where the state is todo.
+				//(The three states are: todo, complete, graded-right/partial/invalid). We need todo.
+				//We only need the id's, really...
+				$steps = $DB->get_records_sql("SELECT id FROM {question_attempt_steps} WHERE state = 'todo' AND questionattemptID = $attempt->id");
+				//var_dump($steps);
+
+				//Sometimes there is no 'todo' so you have to take the first 'complete' instead!
+				if (empty($steps)) {
+					$steps = $DB->get_records_sql("SELECT id FROM {question_attempt_steps} WHERE state = 'complete' AND questionattemptID = $attempt->id ORDER BY id LIMIT 1");
+				}
+
+
+				//Need to treat each step separately...
+				//echo "----------------------------------------\n";
+				//echo "New Loop: ";
+				//echo "----------------------------------------\n";
+				foreach($steps as $step) {
+					//var_dump($step);
+					$stepx = $step->id;
+
+					//Now we need the step data so we can change the values in the value column.
+					//But we only need the ones that are _sub?_order...
+					//Had it ordered by name, but if there were more than 10 of them, the order got screwed up (_sub10_order, sub1_order, etc)
+					//By id seemed to work. But in some cases, the order was screwed up.
+					//Finally found this...
+					$stepdata = $DB->get_records_sql("SELECT * FROM {question_attempt_step_data} WHERE name LIKE '%_order' AND attemptstepid = '$stepx' ORDER BY NULLIF(regexp_replace(name, '\D', '', 'g'), '')::int");
+					//var_dump($stepdata);
+					//Outputs array -> object X however many _sub_order values there are...
+
+					$oldValues = array();
+					$oldValuesArray = array();
+					foreach($stepdata as $key => $item) {
+						//Get the oldValues as an array of string values...
+						$oldValues[] = $item->value;
+						//explode the strings into an array for the replacement list...
+						$oldValuesArray[] = explode(',', $item->value);
 					}
+					// echo "----------------------------------------\n";
+					// echo "Old values:\n";
+					// echo "----------------------------------------\n";
+					// var_dump($oldValues);
 
-	//				var_dump($oldValues);
-	//				var_dump($result);
+					//Sort the oldValues from lowest->highest in their arrays...
+					//(Some values are shuffled, which will ruin the replacement)
+					$oldList = array();
+					foreach($oldValuesArray as $ov) {
+						sort($ov);
+						$oldList[] = $ov;
+					}
+					// echo "----------------------------------------\n";
+					// echo "Old List:\n";
+					// echo "----------------------------------------\n";
+					// var_dump($oldList);
 
-					$subscount = sizeof($result);
-					$y = 0;
-					while($y < $subscount) {
-						foreach($stepdata as $step => $item) {
-	//						echo "original step: ";
-	//						var_dump($step);
-	//						echo "original item: ";
-	//						var_dump($item);
-							//echo "<p>Original step_data value for [ $item->id ] was [ $item->value ]<br>\n";
-							$item->value = $result[$y];
-							$y++;
-	//						echo "y = ";
-	//						var_dump($y);
-	//						echo "New item: ";
-	//						var_dump($item);
+					//Now we need to create an array where the oldValue is the key
+					//And the newValue is the value (for the replacement function)...
+					$newV = new ArrayIterator(array_values($newValues));
+					$oldV = new ArrayIterator(array_values($oldList));
 
-							if($DB->update_record('question_attempt_step_data', $item)) {
-								//echo "Updated step_data value for: [ $item->id ] now [ $item->value ]</p>\n";
-							} else {
-								echo '<p class="red">'."Couldn't update record for [ $item->id ]</p>";
+					$result = new MultipleIterator;
+					$result->attachIterator($oldV);
+					$result->attachIterator($newV);
+
+					// echo "Result: ";
+					// var_dump($result);
+
+					$replaceMArray = array();
+					//Combine the two arrays (oldValue is the key, newValue is the value...
+					foreach($result as $r) {
+						// echo "----------------------------------------\n";
+						// echo "results as r :\n";
+						// echo "----------------------------------------\n";
+						// var_dump($r);
+						//Make sure both arrays have the same number of elements
+						//If not, it means some question-parts were deleted after attempts were made...
+						if(sizeof($r[0]) == sizeof($r[1])) {
+							$replaceMArray[] = array_combine($r[0],$r[1]);
+						} else {
+							//This shouldn't happen now, but if it does...
+
+							echo '<p class="red">Error: Your replacement arrays are not equal for attempt:'.$attempt->id."<br>\n";
+							echo "Make sure no sequence questions are missing for Q [ $parentquestion ] and try again.</p>\n";
+
+						};
+					}
+					//var_dump($replaceMArray);
+
+					//Now make sure the $replaceMArray is not empty before doing the replacement....
+					if(!empty($replaceMArray)) {
+						//Iterate over the replaceArray so we can flatten the multi array into one...
+						$values = new RecursiveIteratorIterator(new RecursiveArrayIterator($replaceMArray));
+
+						//Reassign the key->value relationship...
+						$replace = array();
+						foreach($values as $key => $item) {
+							$replace[$key] = $item;
+						}
+						//Now we have our replacement values!
+						// echo "----------------------------------------\n";
+						// echo "Replacement values:\n";
+						// echo "----------------------------------------\n";
+						// var_dump($replace);
+
+						$result = array();
+						foreach($oldValues as $old) {
+							//var_dump($old);
+							$result[] = strtr($old, $replace);
+						}
+
+						// var_dump($oldValues);
+						// var_dump($result);
+
+						$subscount = sizeof($result);
+						$y = 0;
+						while($y < $subscount) {
+							foreach($stepdata as $step => $item) {
+								// echo "original step: ";
+								// var_dump($step);
+								// echo "original item: ";
+								// var_dump($item);
+								//echo "<p>Original step_data value for [ $item->id ] was [ $item->value ]<br>\n";
+								$item->value = $result[$y];
+								$y++;
+								// echo "y = ";
+								// var_dump($y);
+								// echo "New item: ";
+								// var_dump($item);
+
+								if($DB->update_record('question_attempt_step_data', $item)) {
+									//echo "Updated step_data value for: [ $item->id ] now [ $item->value ]</p>\n";
+								} else {
+									echo '<p class="red">'."Couldn't update record for [ $item->id ]</p>";
+								}
 							}
 						}
 					}
 				}
-			}
 
-	}
+			}// End foreach attemptids as attempt
 
-		}//End if attemptids
+		}//End if ! attemptids
 
 		echo "<hr>\n";
-	}//End if parent
+	}//End if parent != seq_parent
 
 	return $message;
 
@@ -1660,9 +1661,9 @@ if (!empty($options['fix'])) {
 }
 
 if($options['questions']) {
-//////////////////////////////////////////////////////
-//If you have specified a question (not a course)....
-//////////////////////////////////////////////////////
+	//////////////////////////////////////////////////////
+	//If you have specified a question (not a course)....
+	//////////////////////////////////////////////////////
 	$questions = $DB->get_recordset_sql('
 		SELECT q.id as question,q.questiontext,qm.sequence
 		FROM mdl_question q
@@ -1804,7 +1805,7 @@ if($options['questions']) {
 		//var_dump($getinfo);
 		if(!empty($getinfo)) {
 			if (!empty($options['info'])) {
-			//var_dump($getinfo);
+				//var_dump($getinfo);
 				return_info($getinfo,$x,$options);
 			}
 			else if (!empty($options['fix'])) {
@@ -1862,20 +1863,20 @@ if(!empty($options['fix'])) {
 	foreach($result as $message) {
 		//var_dump($message);
 		if(!empty($message['fix1-problem'])) {
-		$update_problem[] 	= count($message['fix1-problem']);
+			$update_problem[] 	= count($message['fix1-problem']);
 		}
 		if(!empty($message['fix1-success'])) {
-		$update_success[] 	= count($message['fix1-success']);
+			$update_success[] 	= count($message['fix1-success']);
 		}
 		if(!empty($message['fix3-updated'])) {
-		$new_updated[]		= count($message['fix3-updated']);
+			$new_updated[]		= count($message['fix3-updated']);
 		}
 		if(!empty($message['fix3-newqs'])) {
-		$new_qs[]			= count($message['fix3-newqs']);
-		$new_QA[]			= count($message['fix3-newQA']);
-		$new_NumQ[]			= count($message['fix3-newNumQ']);
-		$new_MCQ[]			= count($message['fix3-newMCQ']);
-		$new_SAQ[]			= count($message['fix3-newSAQ']);
+			$new_qs[]			= count($message['fix3-newqs']);
+			$new_QA[]			= count($message['fix3-newQA']);
+			$new_NumQ[]			= count($message['fix3-newNumQ']);
+			$new_MCQ[]			= count($message['fix3-newMCQ']);
+			$new_SAQ[]			= count($message['fix3-newSAQ']);
 		}
 	}
 
@@ -1883,7 +1884,7 @@ if(!empty($options['fix'])) {
 
 	echo '<p class="red">'."Fails:</p>\n";
 	if(!empty($update_problem)) {
-	echo "<p>...[".array_sum($update_problem)."] question(s) could not be fixed and requires manual intervention.</p>\n";
+		echo "<p>...[".array_sum($update_problem)."] question(s) could not be fixed and requires manual intervention.</p>\n";
 	} else {
 		echo "<p>NIL</p>\n";
 	}
@@ -1891,14 +1892,14 @@ if(!empty($options['fix'])) {
 	echo "\n";
 	echo '<p class="green">'."Successes:</p>\n";
 	if(!empty($update_success)) {
-	echo "<p>...[ <b>".array_sum($update_success)."</b> ] sequence(s) updated.</p>\n";
+		echo "<p>...[ <b>".array_sum($update_success)."</b> ] sequence(s) updated.</p>\n";
 	}
 	if(!empty($new_qs)) {
-	echo "<p>...[ <b>".array_sum($new_qs)." </b>] new <b>questions</b> were added to the mdl_question table.<br>\n";
-	echo "...[ <b>".array_sum($new_QA)." </b>] new <b>answers</b> were added to the mdl_question_answers table.<br>\n";
-	echo "...[ <b>".array_sum($new_NumQ)." </b>] new <b>numerical</b> questions were added to the mdl_question_numerical table.<br>\n";
-	echo "...[ <b>".array_sum($new_MCQ)." </b>] new <b>multi-choice</b> questions were added to the mdl_qtype_multichoice_options table.<br>\n";
-	echo "...[ <b>".array_sum($new_SAQ)." </b>] new <b>short-answer</b> questions were added to the mdl_qtype_shortanswer_options table.</p>\n";
+		echo "<p>...[ <b>".array_sum($new_qs)." </b>] new <b>questions</b> were added to the mdl_question table.<br>\n";
+		echo "...[ <b>".array_sum($new_QA)." </b>] new <b>answers</b> were added to the mdl_question_answers table.<br>\n";
+		echo "...[ <b>".array_sum($new_NumQ)." </b>] new <b>numerical</b> questions were added to the mdl_question_numerical table.<br>\n";
+		echo "...[ <b>".array_sum($new_MCQ)." </b>] new <b>multi-choice</b> questions were added to the mdl_qtype_multichoice_options table.<br>\n";
+		echo "...[ <b>".array_sum($new_SAQ)." </b>] new <b>short-answer</b> questions were added to the mdl_qtype_shortanswer_options table.</p>\n";
 	}
 
 } else if (!empty($options['info'])) {
@@ -1906,8 +1907,8 @@ if(!empty($options['fix'])) {
 		//could put values here...
 	//};
 } else {
-	echo "...To fix all corrupt questions, run: \$sudo -u wwwrun php ./fix_course_sequence.php --questions=* --fix --verbose". "\n\n"
-		."...To fix a specified question,  run: \$sudo -u wwwrun php ./fix_course_sequence.php --questions=[type in questionid] --fix --verbose". "\n\n";
+	echo "...To fix all corrupt questions, run: \$sudo -u wwwrun php ./fix_multianswer_questions_v2.php --questions=* --fix --verbose". "\n\n"
+		."...To fix a specified question,  run: \$sudo -u wwwrun php ./fix_multianswer_questions_v2.php --questions=[type in questionid] --fix --verbose". "\n\n";
 }
 
 ?>
