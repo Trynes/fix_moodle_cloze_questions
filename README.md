@@ -154,5 +154,6 @@ If you run it for 1 question that just has the wrong parent only, it will work f
   <br>sudo -u www-data /usr/bin/php admin/cli/fix_multianswer_questions_v3.php --questions=123456 --fix --verbose 2>&1 | tee FIX_cloze.html
 
 ----------------------------------------------------------------------------------------------
-If you have any question/comments, feel free to create an issue (if you can). Or email me. I assume that info is on here somewhere?
+If you have any question/comments, feel free to create an issue (if you can). 
+Or email me : rebecca.trynes@cit.edu.au
 ----------------------------------------------------------------------------------------------
